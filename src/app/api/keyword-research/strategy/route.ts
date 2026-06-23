@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const report = existing.report;
     if (!report?.listings?.length) {
       return NextResponse.json(
-        { error: "Run keyword research search first." },
+        { error: "Run a rank tracker search first." },
         { status: 400 }
       );
     }

@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Keyword research POST error:", error);
     const message =
-      error instanceof Error ? error.message : "Failed to run keyword research";
+      error instanceof Error ? error.message : "Failed to run rank tracker search";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

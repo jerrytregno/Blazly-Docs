@@ -82,8 +82,8 @@ export function PositionTrackingCard({
         {topKeywords.length === 0 ? (
           <div className="p-8 text-center text-base text-gray-500">
             No keywords tracked yet.{" "}
-            <Link href="/dashboard/rank-tracker/keywords" className="font-medium text-indigo-600 hover:underline">
-              Add keywords
+            <Link href="/dashboard/rank-tracker" className="font-medium text-indigo-600 hover:underline">
+              Track rankings
             </Link>
           </div>
         ) : (
@@ -116,7 +116,7 @@ export function PositionTrackingCard({
 
         <div className="border-t border-gray-200 px-5 py-4">
           <Link
-            href="/dashboard/rank-tracker/keywords"
+            href="/dashboard/rank-tracker"
             className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
           >
             View all keywords →

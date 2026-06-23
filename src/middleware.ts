@@ -3,7 +3,6 @@ import type { NextRequest } from "next/server";
 
 const REMOVED_PREFIXES = [
   "/dashboard/gbp",
-  "/dashboard/rank-tracker",
   "/dashboard/ai-strategist",
   "/dashboard/competitors",
   "/dashboard/reviews",
@@ -11,6 +10,20 @@ const REMOVED_PREFIXES = [
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (
+    pathname === "/dashboard/keyword-research" ||
+    pathname.startsWith("/dashboard/keyword-research/")
+  ) {
+    return NextResponse.redirect(new URL("/dashboard/rank-tracker", request.url));
+  }
+
+  if (
+    pathname.startsWith("/dashboard/rank-tracker/") &&
+    pathname !== "/dashboard/rank-tracker"
+  ) {
+    return NextResponse.redirect(new URL("/dashboard/rank-tracker", request.url));
+  }
 
   if (
     REMOVED_PREFIXES.some(
@@ -25,8 +38,10 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/dashboard/gbp/:path*",
+    "/dashboard/keyword-research",
+    "/dashboard/keyword-research/:path*",
     "/dashboard/rank-tracker/:path*",
+    "/dashboard/gbp/:path*",
     "/dashboard/ai-strategist/:path*",
     "/dashboard/competitors/:path*",
     "/dashboard/reviews/:path*",

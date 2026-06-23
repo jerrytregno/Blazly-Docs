@@ -5,7 +5,7 @@ import {
   ClipboardCheck,
   ImageIcon,
   BarChart3,
-  Search,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 
@@ -58,10 +58,10 @@ export const navigation: NavSection[] = [
     href: "/dashboard/profile-optimization",
   },
   {
-    id: "keyword-research",
-    label: "Keyword Research",
-    icon: Search,
-    href: "/dashboard/keyword-research",
+    id: "rank-tracker",
+    label: "Rank Tracker",
+    icon: TrendingUp,
+    href: "/dashboard/rank-tracker",
   },
   {
     id: "competitor-analysis",
