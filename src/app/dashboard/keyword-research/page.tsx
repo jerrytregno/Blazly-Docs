@@ -31,10 +31,12 @@ export default function KeywordResearchPage() {
   const { user } = useAuth();
   const { business } = useData();
 
-  const businessLocation = useMemo(
-    () => business?.city?.trim() || resolveSearchLocation(business ?? ""),
-    [business]
-  );
+  const businessLocation = useMemo(() => {
+    const city = business?.city?.trim();
+    if (city) return city;
+    if (business) return resolveSearchLocation(business);
+    return "";
+  }, [business]);
   const defaultCategory = business?.primaryCategory || "";
 
   const [category, setCategory] = useState(defaultCategory);
