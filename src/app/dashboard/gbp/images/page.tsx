@@ -25,9 +25,9 @@ export default function ImagesPage() {
           <CardContent>
             <ul className="space-y-2">
               {sections.map((img) => (
-                <li key={img.type} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm">
-                  <span className="font-medium text-white">{img.type}</span>
-                  <span className="text-[#b8a9d9]">{img.count} uploaded · {img.status}</span>
+                <li key={img.type} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  <span className="font-medium text-slate-900">{img.type}</span>
+                  <span className="text-slate-500">{img.count} uploaded · {img.status}</span>
                 </li>
               ))}
             </ul>

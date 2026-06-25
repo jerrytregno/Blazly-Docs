@@ -60,7 +60,7 @@ export default function BusinessDetailsPage() {
               ))}
               <div className="flex items-center gap-3 sm:col-span-2">
                 <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Save Changes"}</Button>
-                {saved && <span className="text-sm text-emerald-400">Saved</span>}
+                {saved && <span className="text-sm text-emerald-600">Saved</span>}
               </div>
             </form>
           </CardContent>

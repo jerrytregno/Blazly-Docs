@@ -38,6 +38,10 @@ export async function POST(request: NextRequest) {
           (session.client_reference_id ?? undefined);
 
         if (uid) {
+          const slotCount = Math.max(
+            1,
+            parseInt(session.metadata?.businessQuantity ?? "1", 10) || 1
+          );
           await grantPaidBusinessSlot(uid, {
             stripeCustomerId:
               typeof session.customer === "string" ? session.customer : null,
@@ -45,6 +49,7 @@ export async function POST(request: NextRequest) {
               typeof session.subscription === "string" ? session.subscription : null,
             subscriptionStatus: "active",
             checkoutSessionId: session.id,
+            slotCount,
           });
         } else {
           console.warn("checkout.session.completed without firebaseUid:", session.id);

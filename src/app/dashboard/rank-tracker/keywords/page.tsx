@@ -19,20 +19,20 @@ export default function KeywordsPage() {
           <CardHeader><CardTitle>Keyword Dashboard</CardTitle></CardHeader>
           <CardContent className="overflow-x-auto p-0">
             {keywords.length === 0 ? (
-              <p className="p-6 text-sm text-[#b8a9d9]">No keywords tracked yet.</p>
+              <p className="p-6 text-sm text-slate-500">No keywords tracked yet.</p>
             ) : (
               <table className="w-full text-sm">
-                <thead><tr className="border-b border-white/10 text-left text-[#9b8ab8]"><th className="p-4">Keyword</th><th className="p-4">Search Volume</th><th className="p-4">Rank</th><th className="p-4">Change</th></tr></thead>
+                <thead><tr className="border-b border-slate-200 text-left text-slate-400"><th className="p-4">Keyword</th><th className="p-4">Search Volume</th><th className="p-4">Rank</th><th className="p-4">Change</th></tr></thead>
                 <tbody>
                   {keywords.map((kw) => (
-                    <tr key={kw.keyword} className="border-b border-white/10">
-                      <td className="p-4 font-medium text-white">{kw.keyword}</td>
-                      <td className="p-4 text-[#d4c4f5]">{kw.volume.toLocaleString()}</td>
-                      <td className="p-4 text-[#d4c4f5]">#{kw.rank}</td>
+                    <tr key={kw.keyword} className="border-b border-slate-100">
+                      <td className="p-4 font-medium text-slate-900">{kw.keyword}</td>
+                      <td className="p-4 text-slate-700">{kw.volume.toLocaleString()}</td>
+                      <td className="p-4 text-slate-700">#{kw.rank}</td>
                       <td className="p-4">
                         {kw.change > 0 && <Badge variant="success">+{kw.change}</Badge>}
                         {kw.change < 0 && <Badge variant="warning">{kw.change}</Badge>}
-                        {kw.change === 0 && <span className="text-[#9b8ab8]">—</span>}
+                        {kw.change === 0 && <span className="text-slate-400">—</span>}
                       </td>
                     </tr>
                   ))}
@@ -43,7 +43,7 @@ export default function KeywordsPage() {
         </Card>
         <ShareOfVoicePanel data={rankings?.shareOfVoice} />
         <div className="flex justify-end">
-          <Link href="/dashboard/rank-tracker/geo-grid" className="text-sm text-violet-300 hover:text-violet-200">
+          <Link href="/dashboard/rank-tracker/geo-grid" className="text-sm text-indigo-600 hover:text-indigo-700">
             View geo-grid rankings →
           </Link>
         </div>

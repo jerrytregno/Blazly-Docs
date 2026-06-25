@@ -36,7 +36,7 @@ export default function RecommendationsPage() {
     <PageDataGuard>
       <div className="space-y-6">
         <Card>
-          <CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-violet-400" />Ask Blazly AI</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-indigo-500" />Ask Blazly AI</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-2">
               <input className="auth-input h-11 flex-1 rounded-xl px-4 text-sm" placeholder="Ask anything about your local SEO..." value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => e.key === "Enter" && question && ask(question)} />
@@ -44,15 +44,15 @@ export default function RecommendationsPage() {
             </div>
             <div className="space-y-3">
               {ASK_BLAZLY_EXAMPLES.map((ex) => (
-                <button key={ex.question} type="button" onClick={() => ask(ex.question)} className="block w-full rounded-xl border border-white/10 bg-white/5 p-3 text-left transition hover:bg-white/10">
-                  <p className="text-xs font-medium text-violet-300">{ex.category}</p>
-                  <p className="mt-1 text-sm text-[#d4c4f5]">{ex.question}</p>
+                <button key={ex.question} type="button" onClick={() => ask(ex.question)} className="block w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:bg-slate-100">
+                  <p className="text-xs font-medium text-indigo-600">{ex.category}</p>
+                  <p className="mt-1 text-sm text-slate-700">{ex.question}</p>
                 </button>
               ))}
             </div>
             {(answer || loading) && (
-              <div className="rounded-xl border border-violet-400/30 bg-violet-500/10 p-4">
-                {loading ? <p className="text-sm text-[#b8a9d9]">Analyzing...</p> : <p className="whitespace-pre-wrap text-sm text-[#d4c4f5]">{answer}</p>}
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4">
+                {loading ? <p className="text-sm text-slate-500">Analyzing...</p> : <p className="whitespace-pre-wrap text-sm text-slate-700">{answer}</p>}
               </div>
             )}
           </CardContent>
@@ -62,12 +62,12 @@ export default function RecommendationsPage() {
           <CardHeader><CardTitle>Action Recommendations</CardTitle></CardHeader>
           <CardContent>
             {(dashboard?.strategistRecommendations.length ?? 0) === 0 ? (
-              <p className="text-sm text-[#b8a9d9]">No recommendations yet.</p>
+              <p className="text-sm text-slate-500">No recommendations yet.</p>
             ) : (
               <ul className="space-y-3">
                 {dashboard?.strategistRecommendations.map((rec) => (
-                  <li key={rec.title} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-4">
-                    <div><p className="font-medium text-white">{rec.title}</p><p className="text-sm text-[#b8a9d9]">{rec.category} · Impact: {rec.impact}</p></div>
+                  <li key={rec.title} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div><p className="font-medium text-slate-900">{rec.title}</p><p className="text-sm text-slate-500">{rec.category} · Impact: {rec.impact}</p></div>
                     <Badge variant={rec.priority === "high" ? "warning" : "secondary"}>{rec.priority}</Badge>
                   </li>
                 ))}
@@ -85,8 +85,8 @@ export default function RecommendationsPage() {
           <CardHeader><CardTitle>AI Capabilities</CardTitle></CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2">
             {AI_CAPABILITIES.map((cap) => (
-              <div key={cap} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-[#d4c4f5]">
-                <Star className="h-4 w-4 text-violet-400" />{cap}
+              <div key={cap} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                <Star className="h-4 w-4 text-indigo-500" />{cap}
               </div>
             ))}
           </CardContent>

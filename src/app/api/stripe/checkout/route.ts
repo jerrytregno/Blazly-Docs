@@ -6,11 +6,16 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    const { idToken } = (await request.json()) as { idToken?: string };
+    const { idToken, quantity: rawQuantity } = (await request.json()) as {
+      idToken?: string;
+      quantity?: number;
+    };
 
     if (!idToken?.trim()) {
       return NextResponse.json({ error: "idToken is required" }, { status: 400 });
     }
+
+    const quantity = Math.min(10, Math.max(1, Math.floor(rawQuantity ?? 1)));
 
     const stripe = getStripe();
     if (!stripe || !STRIPE_PRICE_ID) {
@@ -39,14 +44,14 @@ export async function POST(request: NextRequest) {
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
-      line_items: [{ price: STRIPE_PRICE_ID, quantity: 1 }],
+      line_items: [{ price: STRIPE_PRICE_ID, quantity }],
       ...(customerId
         ? { customer: customerId }
         : email
           ? { customer_email: email }
           : {}),
       client_reference_id: uid,
-      metadata: { firebaseUid: uid },
+      metadata: { firebaseUid: uid, businessQuantity: String(quantity) },
       subscription_data: { metadata: { firebaseUid: uid } },
       allow_promotion_codes: true,
       success_url: `${appUrl}/dashboard/pricing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,

@@ -123,7 +123,7 @@ export function FeatureHighlightsRow({
             <>
               <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-indigo-600 transition-colors group-hover:border-indigo-200 group-hover:bg-indigo-50">
                 <tool.icon className="h-5 w-5" />
-                {tool.requiresPro && (
+                {locked && (
                   <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full border border-white bg-slate-100 text-slate-500 shadow-sm">
                     <Lock className="h-3 w-3" aria-hidden />
                   </span>
@@ -135,7 +135,7 @@ export function FeatureHighlightsRow({
                   <h3 className="text-lg font-semibold text-slate-900 group-hover:text-indigo-700">
                     {tool.title}
                   </h3>
-                  {tool.requiresPro && (
+                  {locked && (
                     <Lock className="hidden h-4 w-4 shrink-0 text-slate-400 sm:block" aria-hidden />
                   )}
                 </div>

@@ -55,14 +55,13 @@ interface PaidBusinessRecord {
   subscriptionStatus?: string | null;
   /** Stripe Checkout session id — used to make webhook processing idempotent. */
   checkoutSessionId?: string | null;
+  /** Number of business slots to grant (from checkout quantity). */
+  slotCount?: number;
 }
 
 /**
- * Marks a user as paid: upgrades them to the Pro plan and grants one additional
- * business slot. Processing is idempotent per Stripe Checkout session so the
- * same webhook event is never counted twice.
- *
- * @returns true when a slot was granted, false when skipped (already processed).
+ * Marks a user as paid: upgrades them to the Pro plan and grants additional
+ * business slots. Processing is idempotent per Stripe Checkout session.
  */
 export async function grantPaidBusinessSlot(
   uid: string,
@@ -71,6 +70,7 @@ export async function grantPaidBusinessSlot(
   const db = getAdminDb();
   if (!db) return false;
 
+  const slotCount = Math.max(1, record.slotCount ?? 1);
   const userRef = db.collection("users").doc(uid);
 
   return db.runTransaction(async (tx) => {
@@ -87,7 +87,7 @@ export async function grantPaidBusinessSlot(
 
     const update: Record<string, unknown> = {
       plan: "Pro",
-      businessSlots: FieldValue.increment(1),
+      businessSlots: FieldValue.increment(slotCount),
       paidAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     };

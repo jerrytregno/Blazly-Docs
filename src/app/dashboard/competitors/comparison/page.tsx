@@ -43,11 +43,11 @@ export default function ComparisonPage() {
           <CardContent className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-white/10 text-left">
-                  <th className="p-3 text-[#9b8ab8]">Metric</th>
-                  <th className="p-3 text-violet-300">You</th>
-                  {top.map((c) => <th key={c.name} className="p-3 text-[#9b8ab8]">{c.name}</th>)}
-                  <th className="p-3 text-[#9b8ab8]">Gap</th>
+                <tr className="border-b border-slate-200 text-left">
+                  <th className="p-3 text-slate-400">Metric</th>
+                  <th className="p-3 text-indigo-600">You</th>
+                  {top.map((c) => <th key={c.name} className="p-3 text-slate-400">{c.name}</th>)}
+                  <th className="p-3 text-slate-400">Gap</th>
                 </tr>
               </thead>
               <tbody>
@@ -60,20 +60,20 @@ export default function ComparisonPage() {
                   const gap = typeof yourVal === "number" ? (bestCompetitor as number) - yourVal : 0;
 
                   return (
-                    <tr key={metric} className="border-b border-white/10">
-                      <td className="p-3 font-medium text-white">{metric}</td>
-                      <td className={cn("p-3", youWins(metric) ? "text-emerald-400" : "text-[#d4c4f5]")}>
+                    <tr key={metric} className="border-b border-slate-100">
+                      <td className="p-3 font-medium text-slate-900">{metric}</td>
+                      <td className={cn("p-3", youWins(metric) ? "text-emerald-600" : "text-slate-700")}>
                         {yourVal}
                         {youWins(metric) && <Badge variant="success" className="ml-2 text-[10px]">Lead</Badge>}
                       </td>
                       {top.map((c) => (
-                        <td key={c.name} className="p-3 text-[#d4c4f5]">{getValue(c, metric)}</td>
+                        <td key={c.name} className="p-3 text-slate-700">{getValue(c, metric)}</td>
                       ))}
                       <td className="p-3">
                         {gap > 0 ? (
-                          <span className="text-amber-400">-{gap}</span>
+                          <span className="text-amber-600">-{gap}</span>
                         ) : (
-                          <span className="text-emerald-400">+{Math.abs(gap)}</span>
+                          <span className="text-emerald-600">+{Math.abs(gap)}</span>
                         )}
                       </td>
                     </tr>

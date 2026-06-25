@@ -15,13 +15,13 @@ export default function ServicesPage() {
           <CardHeader><CardTitle>Services</CardTitle></CardHeader>
           <CardContent>
             {(business?.services.length ?? 0) === 0 ? (
-              <p className="text-sm text-[#b8a9d9]">No services added yet.</p>
+              <p className="text-sm text-slate-500">No services added yet.</p>
             ) : (
-              <ul className="divide-y divide-white/10">
+              <ul className="divide-y divide-slate-200">
                 {business?.services.map((s) => (
                   <li key={s.name} className="py-4 first:pt-0 last:pb-0">
-                    <p className="font-medium text-white">{s.name}</p>
-                    <p className="mt-1 text-sm text-[#b8a9d9]">{s.description}</p>
+                    <p className="font-medium text-slate-900">{s.name}</p>
+                    <p className="mt-1 text-sm text-slate-500">{s.description}</p>
                   </li>
                 ))}
               </ul>
@@ -32,8 +32,8 @@ export default function ServicesPage() {
           <Card>
             <CardHeader><CardTitle>Competitor Services</CardTitle></CardHeader>
             <CardContent>
-              <ul className="space-y-2">{(business?.competitorServices ?? []).map((s) => <li key={s} className="text-sm text-[#d4c4f5]">{s}</li>)}</ul>
-              {(business?.competitorServices.length ?? 0) === 0 && <p className="text-sm text-[#b8a9d9]">None listed</p>}
+              <ul className="space-y-2">{(business?.competitorServices ?? []).map((s) => <li key={s} className="text-sm text-slate-700">{s}</li>)}</ul>
+              {(business?.competitorServices.length ?? 0) === 0 && <p className="text-sm text-slate-500">None listed</p>}
             </CardContent>
           </Card>
           <InsightPanel title="Insights" items={business?.missingServices.length ? [`Missing: ${business.missingServices.join(", ")}`] : ["No service gaps identified"]} variant="ai" />

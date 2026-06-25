@@ -40,17 +40,17 @@ export default function MapsRankingsPage() {
           {(rankings?.mapsRankingTypes ?? []).map((m) => (
             <Card key={m.type}>
               <CardContent className="p-4">
-                <p className="text-sm text-[#b8a9d9]">{m.type}</p>
-                <p className="mt-1 text-2xl font-bold text-white">#{m.rank || "—"}</p>
+                <p className="text-sm text-slate-500">{m.type}</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900">#{m.rank || "—"}</p>
                 {m.change !== 0 && <Badge variant={m.change > 0 ? "success" : "warning"} className="mt-2">{m.change > 0 ? "+" : ""}{m.change}</Badge>}
               </CardContent>
             </Card>
           ))}
         </div>
-        <Card className="border-violet-500/20">
+        <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Geo-Grid Preview</CardTitle>
-            <Link href="/dashboard/rank-tracker/geo-grid" className="text-sm text-violet-300 hover:text-violet-200">
+            <Link href="/dashboard/rank-tracker/geo-grid" className="text-sm text-indigo-600 hover:text-indigo-700">
               Full grid →
             </Link>
           </CardHeader>

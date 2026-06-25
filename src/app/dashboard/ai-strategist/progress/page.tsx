@@ -18,7 +18,7 @@ export default function ProgressPage() {
             <div className="flex-1 space-y-4">
               {(dashboard?.progressAreas ?? []).map((area) => (
                 <div key={area.label}>
-                  <div className="mb-1 flex justify-between text-sm text-[#d4c4f5]"><span>{area.label}</span><span>{area.progress}%</span></div>
+                  <div className="mb-1 flex justify-between text-sm text-slate-700"><span>{area.label}</span><span>{area.progress}%</span></div>
                   <ProgressBar value={area.progress} />
                 </div>
               ))}
@@ -30,7 +30,7 @@ export default function ProgressPage() {
           <CardContent className="space-y-4">
             {(dashboard?.gbpHealthBreakdown ?? []).map((item) => (
               <div key={item.label}>
-                <div className="mb-1 flex justify-between text-sm text-[#d4c4f5]"><span>{item.label}</span><span>{item.score}/100</span></div>
+                <div className="mb-1 flex justify-between text-sm text-slate-700"><span>{item.label}</span><span>{item.score}/100</span></div>
                 <ProgressBar value={item.score} />
               </div>
             ))}

@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp, Timestamp, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { initializeUserData } from "@/lib/firestore/collections";
 import { hasActiveBusiness } from "@/lib/firestore/reset-business";
@@ -32,6 +32,12 @@ function mapProfileData(userId: string, data: Record<string, unknown>): UserProf
     timeZone: (data.timeZone as string) ?? "America/New_York",
     plan: parsePlan(data.plan),
     businessSlots: typeof data.businessSlots === "number" ? data.businessSlots : 0,
+    businessesUsed:
+      typeof data.businessesUsed === "number"
+        ? data.businessesUsed
+        : data.onboardingComplete === true
+          ? 1
+          : 0,
     stripeCustomerId: (data.stripeCustomerId as string) ?? undefined,
     stripeSubscriptionId: (data.stripeSubscriptionId as string) ?? undefined,
     subscriptionStatus: (data.subscriptionStatus as string) ?? undefined,
@@ -64,6 +70,7 @@ export async function ensureUserProfile(userId: string): Promise<void> {
     timeZone: "America/New_York",
     plan: "Free",
     businessSlots: 0,
+    businessesUsed: 0,
     onboardingComplete: false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -116,29 +123,34 @@ export async function updateUserBusinessProfile(
 
 export async function completeOnboarding(
   userId: string,
-  input: OnboardingInput
+  input: OnboardingInput,
+  options?: { isAddingBusiness?: boolean; isReplacingBusiness?: boolean }
 ): Promise<void> {
   const website = input.website.trim().replace(/^https?:\/\//, "");
   const mapsPlaceId = input.mapsPlaceId?.trim() ?? "";
 
   await initializeUserData(userId, input);
 
-  await setDoc(
-    doc(db, "users", userId),
-    {
-      userId,
-      businessName: input.businessName.trim(),
-      website,
-      category: input.category.trim(),
-      location: input.location.trim(),
-      mapsPlaceId,
-      companyName: input.businessName.trim(),
-      onboardingComplete: true,
-      updatedAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
-    },
-    { merge: true }
-  );
+  const profileUpdate: Record<string, unknown> = {
+    userId,
+    businessName: input.businessName.trim(),
+    website,
+    category: input.category.trim(),
+    location: input.location.trim(),
+    mapsPlaceId,
+    companyName: input.businessName.trim(),
+    onboardingComplete: true,
+    updatedAt: serverTimestamp(),
+    createdAt: serverTimestamp(),
+  };
+
+  if (options?.isAddingBusiness) {
+    profileUpdate.businessesUsed = increment(1);
+  } else if (!options?.isReplacingBusiness) {
+    profileUpdate.businessesUsed = 1;
+  }
+
+  await setDoc(doc(db, "users", userId), profileUpdate, { merge: true });
 }
 
 export async function getPostAuthPath(userId: string): Promise<string> {

@@ -15,6 +15,7 @@ import type { AccountPlan } from "@/types/user";
 interface PlanContextValue {
   plan: AccountPlan;
   businessSlots: number;
+  businessesUsed: number;
   loading: boolean;
   isPro: boolean;
   refreshPlan: () => Promise<void>;
@@ -26,18 +27,21 @@ export function PlanProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [plan, setPlan] = useState<AccountPlan>("Free");
   const [businessSlots, setBusinessSlots] = useState(0);
+  const [businessesUsed, setBusinessesUsed] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const refreshPlan = async () => {
     if (!user) {
       setPlan("Free");
       setBusinessSlots(0);
+      setBusinessesUsed(0);
       setLoading(false);
       return;
     }
     const profile = await getUserProfile(user.uid);
     setPlan(profile?.plan ?? "Free");
     setBusinessSlots(profile?.businessSlots ?? 0);
+    setBusinessesUsed(profile?.businessesUsed ?? 0);
     setLoading(false);
   };
 
@@ -51,6 +55,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
       value={{
         plan,
         businessSlots,
+        businessesUsed,
         loading,
         isPro: hasProAccess(plan),
         refreshPlan,

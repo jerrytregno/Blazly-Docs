@@ -8,6 +8,7 @@ import { navigation } from "@/config/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { usePlan } from "@/components/providers/plan-provider";
 import { useUpgradeModal } from "@/components/billing/upgrade-modal-provider";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useState } from "react";
 
 function isSectionActive(
@@ -29,6 +30,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const { isPro } = usePlan();
   const { openUpgradeModal } = useUpgradeModal();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [signOutOpen, setSignOutOpen] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     navigation.forEach((section) => {
@@ -50,6 +52,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
     setLoggingOut(true);
     try {
       await logout();
+      setSignOutOpen(false);
       onNavigate?.();
       router.replace("/login");
     } catch {
@@ -59,6 +62,17 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <ConfirmDialog
+        open={signOutOpen}
+        title="Sign out?"
+        description="You'll need to sign in again to access your dashboard and business data."
+        confirmLabel="Sign out"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={loggingOut}
+        onConfirm={handleLogout}
+        onCancel={() => !loggingOut && setSignOutOpen(false)}
+      />
       <nav className="shrink-0 space-y-0.5 px-3 py-4">
         {navigation.map((section) => {
           const Icon = section.icon;
@@ -103,7 +117,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className="flex-1 truncate">{section.label}</span>
-                {!section.free && (
+                {!section.free && !isPro && (
                   <Lock className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
                 )}
               </Link>
@@ -182,7 +196,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
         </Link>
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => setSignOutOpen(true)}
           disabled={loggingOut}
           className="blazly-nav-item w-full text-sm hover:text-red-300 disabled:opacity-50"
         >

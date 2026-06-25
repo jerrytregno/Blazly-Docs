@@ -19,6 +19,7 @@ import {
   clearPendingOnboarding,
   canAccessBusinessSetup,
   isReplacingBusiness,
+  isAddingBusiness,
 } from "@/lib/onboarding-flow";
 
 type Step = "form" | "analyzing" | "complete";
@@ -31,6 +32,7 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const replacing = isReplacingBusiness();
+  const adding = isAddingBusiness();
 
   const [businessName, setBusinessName] = useState("");
   const [website, setWebsite] = useState("");
@@ -77,13 +79,17 @@ export default function OnboardingPage() {
     try {
       const mapsPlaceId =
         parseGoogleMapsPlaceId(trimmedMaps) || trimmedMaps;
-      await completeOnboarding(user.uid, {
-        businessName,
-        website,
-        category,
-        location,
-        mapsPlaceId,
-      });
+      await completeOnboarding(
+        user.uid,
+        {
+          businessName,
+          website,
+          category,
+          location,
+          mapsPlaceId,
+        },
+        { isAddingBusiness: adding, isReplacingBusiness: replacing }
+      );
       clearPendingOnboarding();
       setStep("analyzing");
       try {

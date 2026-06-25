@@ -52,6 +52,10 @@ export interface BusinessDoc {
   imageSections: ImageSection[];
   /** User-provided Google Maps Place ID or link — used for direct lookup */
   mapsPlaceId?: string;
+  /** AI image enhancements used in the current calendar month (UTC). */
+  imageEnhancementsUsed?: number;
+  /** YYYY-MM period for imageEnhancementsUsed. */
+  imageEnhancementsPeriod?: string;
 }
 
 export interface DashboardMetrics {

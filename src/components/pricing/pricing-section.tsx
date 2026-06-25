@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, CalendarDays, Check, Loader2, Plus } from "lucide-react";
+import { CalendarDays, Check, Loader2, Minus, Plus, ShieldCheck, Zap } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/providers/auth-provider";
 import { usePlan } from "@/components/providers/plan-provider";
 import { startCheckout } from "@/lib/billing";
@@ -31,16 +30,16 @@ const PLAN_FEATURES = [
   "Priority Feature Updates",
 ] as const;
 
-const BUSINESS_TIERS = [
-  { businesses: 1, total: 29 },
-  { businesses: 2, total: 58 },
-  { businesses: 3, total: 87 },
-] as const;
+const PRICE_PER_BUSINESS = 29;
 
 function ProPlanCard() {
   const { user } = useAuth();
   const { isPro, businessSlots, loading, refreshPlan } = usePlan();
   const [submitting, setSubmitting] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+
+  const total = quantity * PRICE_PER_BUSINESS;
+  const hasPaid = isPro && businessSlots > 0;
 
   const handleCheckout = async () => {
     if (!user) {
@@ -49,8 +48,7 @@ function ProPlanCard() {
     }
     setSubmitting(true);
     try {
-      await startCheckout(user);
-      // Browser redirects to Stripe on success; refresh as a fallback.
+      await startCheckout(user, quantity);
       await refreshPlan();
     } catch (error) {
       showToast(
@@ -61,63 +59,137 @@ function ProPlanCard() {
     }
   };
 
-  const hasPaid = isPro && businessSlots > 0;
-
   return (
-    <div className="mx-auto max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="bg-indigo-600 px-5 py-3.5 text-center text-white">
-        <p className="text-[10px] font-semibold uppercase tracking-wider opacity-90">Per business</p>
-        <h2 className="mt-0.5 text-lg font-bold">Local SEO Pro</h2>
-      </div>
+    <div className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+      <div className="grid lg:grid-cols-[1.05fr_1fr]">
+        {/* Left — offer + price + CTA */}
+        <div className="relative flex flex-col border-b border-slate-100 p-6 sm:p-8 lg:border-b-0 lg:border-r">
+          <div className="absolute right-5 top-5">
+            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-600/10 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-indigo-700">
+              Most popular
+            </span>
+          </div>
 
-      <div className="px-5 py-4 text-center">
-        <div className="inline-flex items-baseline gap-1">
-          <span className="text-4xl font-bold text-slate-900">$29</span>
-          <span className="text-base font-medium text-slate-500">/mo</span>
-        </div>
-        <p className="mt-1 text-xs text-slate-600">per Google Business Profile</p>
-        <p className="mt-0.5 text-[11px] text-slate-400">1 business included · add more at $29 each</p>
-      </div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-indigo-600">
+            Per business
+          </p>
+          <h2 className="mt-1 text-2xl font-bold text-slate-900">Local SEO Pro</h2>
+          <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
+            Everything you need to rank higher on Google Maps and win more local customers.
+          </p>
 
-      {hasPaid && (
-        <div className="mx-5 flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
-          <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
-          Active — {businessSlots} business {businessSlots === 1 ? "profile" : "profiles"} unlocked
-        </div>
-      )}
+          <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50/70 p-5">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              How many businesses?
+            </p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  disabled={quantity <= 1}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+                  aria-label="Decrease business count"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <span className="min-w-[5.5rem] text-center text-sm font-semibold text-slate-700">
+                  {quantity} {quantity === 1 ? "business" : "businesses"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => Math.min(10, q + 1))}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+                  aria-label="Increase business count"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
 
-      <ul className="max-h-44 space-y-1.5 overflow-y-auto border-t border-slate-100 px-5 py-3.5">
-        {PLAN_FEATURES.map((feature) => (
-          <li key={feature} className="flex items-start gap-2 text-xs text-slate-700">
-            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" strokeWidth={2.5} />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
+            <div className="mt-5 flex items-end justify-between">
+              <div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-5xl font-extrabold tracking-tight text-slate-900">
+                    ${total}
+                  </span>
+                  <span className="text-lg font-medium text-slate-500">/mo</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  ${PRICE_PER_BUSINESS}/mo × {quantity} Google Business{" "}
+                  {quantity === 1 ? "Profile" : "Profiles"}
+                </p>
+              </div>
+              <span className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700">
+                Just ${PRICE_PER_BUSINESS} each
+              </span>
+            </div>
+          </div>
 
-      <div className="border-t border-slate-100 px-5 pb-5 pt-4">
-        <Button
-          type="button"
-          onClick={handleCheckout}
-          disabled={submitting || loading}
-          className="h-10 w-full rounded-lg bg-blue-600 text-sm font-bold shadow-sm hover:bg-blue-700"
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Redirecting to checkout…
-            </>
-          ) : hasPaid ? (
-            "Pay again — add another business ($29/mo)"
-          ) : (
-            "Subscribe — $29/mo per business"
+          {hasPaid && (
+            <div className="mt-4 flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
+              <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+              Active — {businessSlots} business {businessSlots === 1 ? "profile" : "profiles"} unlocked
+            </div>
           )}
-        </Button>
-        <p className="mt-2 text-center text-[11px] leading-relaxed text-slate-500">
-          14-day money-back guarantee. No long-term contract.
-          <br />
-          Adding another business? You&apos;ll be charged an additional $29/month.
-        </p>
+
+          <div className="mt-auto pt-6">
+            <Button
+              type="button"
+              onClick={handleCheckout}
+              disabled={submitting || loading}
+              className="h-12 w-full rounded-xl bg-blue-600 text-base font-bold shadow-sm hover:bg-blue-700"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Redirecting to checkout…
+                </>
+              ) : hasPaid ? (
+                `Add ${quantity} more — $${total}/mo`
+              ) : (
+                `Get started — $${total}/mo`
+              )}
+            </Button>
+
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+              {[
+                { icon: ShieldCheck, label: "14-day money back" },
+                { icon: Zap, label: "Instant access" },
+                { icon: Check, label: "Cancel anytime" },
+              ].map(({ icon: Icon, label }) => (
+                <div key={label} className="flex flex-col items-center gap-1">
+                  <Icon className="h-4 w-4 text-emerald-600" strokeWidth={2.5} />
+                  <span className="text-[10px] font-medium leading-tight text-slate-500">
+                    {label}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-center text-[11px] leading-relaxed text-slate-400">
+              No long-term contract. One payment unlocks {quantity}{" "}
+              {quantity === 1 ? "business profile" : "business profiles"}.
+            </p>
+          </div>
+        </div>
+
+        {/* Right — full feature list */}
+        <div className="bg-gradient-to-br from-indigo-50/60 via-white to-white p-6 sm:p-8">
+          <p className="text-sm font-bold text-slate-900">Everything included</p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            One plan, the complete local SEO toolkit — no add-ons, no upsells.
+          </p>
+          <ul className="mt-5 space-y-2.5">
+            {PLAN_FEATURES.map((feature) => (
+              <li key={feature} className="flex items-start gap-2.5 text-sm text-slate-700">
+                <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100">
+                  <Check className="h-3 w-3 text-emerald-600" strokeWidth={3} />
+                </span>
+                <span>{feature}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );
@@ -126,135 +198,49 @@ function ProPlanCard() {
 export function PricingSection() {
   return (
     <section className="space-y-10">
-      <ProPlanCard />
-
-      <div className="space-y-8">
-        <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-slate-50 px-5 py-6 sm:px-8">
-          <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
-            Per-business pricing
-          </p>
-          <h3 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
-            One business per subscription
-          </h3>
-          <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-600">
-            Each Google Business Profile you manage needs its own{" "}
-            <strong className="font-semibold text-slate-800">$29/month</strong> plan. Your account can
-            hold one active business on a single subscription — add another location and you pay{" "}
-            <strong className="font-semibold text-slate-800">another $29/month</strong> for that
-            business.
-          </p>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-900">How billing works</h3>
-            <ol className="mt-5 space-y-5">
-              {[
-                {
-                  step: "1",
-                  title: "Subscribe for your first business",
-                  body: "Pay $29/month to unlock the full toolkit for one Google Business Profile.",
-                },
-                {
-                  step: "2",
-                  title: "Manage one location per plan",
-                  body: "Rank tracking, reviews, analytics, and optimization all apply to that single business.",
-                },
-                {
-                  step: "3",
-                  title: "Add more businesses anytime",
-                  body: "Need a second café, clinic, or storefront? Subscribe again at $29/month per additional business.",
-                },
-              ].map((item) => (
-                <li key={item.step} className="flex gap-4">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-sm font-bold text-white">
-                    {item.step}
-                  </span>
-                  <div>
-                    <p className="font-semibold text-slate-900">{item.title}</p>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-600">{item.body}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-slate-900">Monthly cost by business count</h3>
-            <p className="mt-1 text-sm text-slate-500">+$29 for every additional business you add</p>
-            <div className="mt-5 space-y-3">
-              {BUSINESS_TIERS.map((tier, index) => (
-                <div
-                  key={tier.businesses}
-                  className={cn(
-                    "flex items-center justify-between rounded-xl border px-4 py-3",
-                    index === 0
-                      ? "border-indigo-200 bg-indigo-50/60"
-                      : "border-slate-200 bg-slate-50/50"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex -space-x-1">
-                      {Array.from({ length: tier.businesses }).map((_, i) => (
-                        <span
-                          key={i}
-                          className="flex h-8 w-8 items-center justify-center rounded-lg border-2 border-white bg-white shadow-sm"
-                        >
-                          <Building2 className="h-4 w-4 text-indigo-600" />
-                        </span>
-                      ))}
-                    </div>
-                    <span className="text-sm font-medium text-slate-700">
-                      {tier.businesses} {tier.businesses === 1 ? "business" : "businesses"}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-bold text-slate-900">${tier.total}/mo</p>
-                    {index > 0 ? (
-                      <p className="text-xs text-slate-500">+${29 * index} for extra locations</p>
-                    ) : (
-                      <p className="text-xs text-slate-500">base plan</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-              <Plus className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>
-                Each new business is a separate <strong className="font-semibold">$29/month</strong>{" "}
-                subscription — not a shared account limit.
-              </span>
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="max-w-xl">
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Enterprise
+            </p>
+            <h3 className="mt-1 text-xl font-bold text-slate-900">
+              Managing many locations or an agency?
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              For enterprise teams with multiple brands, franchises, or high-volume needs, we offer
+              custom plans and onboarding. Book a demo to talk through pricing and setup with our
+              team.
             </p>
           </div>
+          <Link
+            href={ENTERPRISE_DEMO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-900 bg-amber-900 px-6 text-base font-semibold text-white shadow-sm transition-all hover:bg-amber-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2"
+          >
+            <CalendarDays className="h-4 w-4" />
+            Book a demo
+          </Link>
         </div>
+      </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="max-w-xl">
-              <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                Enterprise
-              </p>
-              <h3 className="mt-1 text-xl font-bold text-slate-900">
-                Managing many locations or an agency?
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                For enterprise teams with multiple brands, franchises, or high-volume needs, we offer
-                custom plans and onboarding. Book a demo to talk through pricing and setup with our
-                team.
-              </p>
-            </div>
-            <Link
-              href={ENTERPRISE_DEMO_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-xl border border-amber-900 bg-amber-900 px-6 text-base font-semibold text-white shadow-sm transition-all hover:bg-amber-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2"
-            >
-              <CalendarDays className="h-4 w-4" />
-              Book a demo
-            </Link>
-          </div>
-        </div>
+      <ProPlanCard />
+
+      <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-slate-50 px-5 py-6 sm:px-8">
+        <p className="text-sm font-semibold uppercase tracking-wide text-indigo-600">
+          Per-business pricing
+        </p>
+        <h3 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
+          One business per subscription
+        </h3>
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-slate-600">
+          Each Google Business Profile you manage needs its own{" "}
+          <strong className="font-semibold text-slate-800">$29/month</strong> plan. Your account can
+          hold one active business on a single subscription — add another location and you pay{" "}
+          <strong className="font-semibold text-slate-800">another $29/month</strong> for that
+          business.
+        </p>
       </div>
     </section>
   );

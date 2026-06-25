@@ -16,6 +16,8 @@ export interface UserProfile {
   plan: AccountPlan;
   /** Number of business profiles the user has paid for (1 payment = 1 slot). */
   businessSlots: number;
+  /** Number of business profiles the user has set up (consumed slots). */
+  businessesUsed: number;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
   subscriptionStatus?: string;

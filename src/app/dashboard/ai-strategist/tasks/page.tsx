@@ -20,12 +20,12 @@ export default function TasksPage() {
         <CardHeader><CardTitle>SEO Tasks</CardTitle></CardHeader>
         <CardContent>
           {(dashboard?.strategistTasks.length ?? 0) === 0 ? (
-            <p className="text-sm text-[#b8a9d9]">No tasks yet.</p>
+            <p className="text-sm text-slate-500">No tasks yet.</p>
           ) : (
             <ul className="space-y-3">
               {dashboard?.strategistTasks.map((task) => (
-                <li key={task.id} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 p-4">
-                  <div><p className="font-medium text-white">{task.title}</p><p className="text-sm capitalize text-[#b8a9d9]">Priority: {task.priority}</p></div>
+                <li key={task.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div><p className="font-medium text-slate-900">{task.title}</p><p className="text-sm capitalize text-slate-500">Priority: {task.priority}</p></div>
                   <Badge variant={statusVariant[task.status]}>{task.status.replace("_", " ")}</Badge>
                 </li>
               ))}

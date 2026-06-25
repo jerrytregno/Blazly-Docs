@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-/** Blazly Local SEO brand mark — https://kommodo.ai/i/oWxwdC81280OzErhStVe */
-export const BRAND_LOGO_SRC =
-  "https://plain-apac-prod-public.komododecks.com/202606/25/oWxwdC81280OzErhStVe/image.png";
+/** Blazly Local SEO brand mark (white tile + bolt) */
+export const BRAND_LOGO_SRC = "/blazly-local-seo-logo.png";
 
 export function BrandLogo({
   href = "/",
@@ -13,30 +12,41 @@ export function BrandLogo({
   className,
 }: {
   href?: string;
-  size?: "sm" | "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
   theme?: "light" | "dark";
   showTagline?: boolean;
   className?: string;
 }) {
   const markHeight =
-    size === "sm" ? 34 : size === "lg" ? 52 : showTagline ? 46 : 38;
+    size === "xs" ? 26 : size === "sm" ? 30 : size === "lg" ? 48 : showTagline ? 38 : 34;
+
   const titleClass =
-    size === "lg" ? "text-xl font-bold" : size === "sm" ? "text-sm font-semibold" : "text-base font-bold";
+    size === "lg"
+      ? "text-xl font-bold"
+      : size === "sm"
+        ? "text-sm font-semibold"
+        : size === "xs"
+          ? "text-sm font-bold"
+          : "text-base font-bold";
   const blazlyWithTaglineClass =
     size === "lg"
       ? "text-2xl font-bold"
       : size === "sm"
         ? "text-sm font-bold"
-        : "text-xl font-bold";
+        : size === "xs"
+          ? "text-base font-bold leading-none"
+          : "text-xl font-bold";
   const localSeoClass =
     size === "lg"
       ? "text-sm font-semibold uppercase tracking-wide"
       : size === "sm"
         ? "text-[10px] font-semibold uppercase tracking-wide"
-        : "text-xs font-semibold uppercase tracking-wide";
+        : size === "xs"
+          ? "text-[9px] font-semibold uppercase tracking-wider"
+          : "text-xs font-semibold uppercase tracking-wide";
 
   const content = (
-    <div className={cn("flex items-center gap-3", className)}>
+    <div className={cn("flex items-center", size === "xs" ? "gap-2" : "gap-2.5", className)}>
       <img
         src={BRAND_LOGO_SRC}
         alt="Blazly Local SEO"

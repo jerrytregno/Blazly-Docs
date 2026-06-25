@@ -5,16 +5,19 @@ import {
   Building2,
   Loader2,
   Pencil,
+  Plus,
   Save,
 } from "lucide-react";
+import Link from "next/link";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useData } from "@/components/providers/data-provider";
+import { usePlan } from "@/components/providers/plan-provider";
 import { PageDataGuard } from "@/components/data/page-data-guard";
-import { SectionHeader } from "@/components/layout/section-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAddBusiness } from "@/hooks/use-add-business";
 import { getUserProfile, updateUserBusinessProfile } from "@/lib/user-profile";
 import { parseGoogleMapsPlaceId, normalizeUserWebsite } from "@/lib/seo/maps-place";
 
@@ -31,6 +34,8 @@ interface EditForm {
 export default function BusinessSettingsPage() {
   const { user } = useAuth();
   const { business, dashboard, saveBusiness, analyzing } = useData();
+  const { businessSlots, businessesUsed, isPro, loading: planLoading } = usePlan();
+  const { requestAdd, dialog: addBusinessDialog } = useAddBusiness();
   const [profile, setProfile] = useState<{
     website: string;
     category: string;
@@ -134,13 +139,46 @@ export default function BusinessSettingsPage() {
     { label: "Address", value: business?.address || form.address || "—" },
   ];
 
+  const hasActiveBusiness = Boolean(business?.name?.trim());
+  const unusedSlots = Math.max(0, businessSlots - businessesUsed);
+  const canAddBusiness = isPro && hasActiveBusiness && unusedSlots > 0;
+  const showAddBusinessCta =
+    !planLoading && (canAddBusiness || (isPro && hasActiveBusiness && unusedSlots === 0));
+
+  const addBusinessButton = showAddBusinessCta ? (
+    canAddBusiness ? (
+      <Button
+        type="button"
+        onClick={requestAdd}
+        className="shrink-0 gap-2 bg-indigo-600 hover:bg-indigo-700"
+      >
+        <Plus className="h-4 w-4" />
+        Add Business
+      </Button>
+    ) : (
+      <Link href="/dashboard/pricing">
+        <Button type="button" className="shrink-0 gap-2 bg-indigo-600 hover:bg-indigo-700">
+          <Plus className="h-4 w-4" />
+          Add Business
+        </Button>
+      </Link>
+    )
+  ) : null;
+
   return (
     <PageDataGuard>
       <div className="space-y-6 pb-20 md:pb-0">
-        <SectionHeader
-          title="Business Settings"
-          description="Manage your active business profile. One business per account."
-        />
+        {addBusinessDialog}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900">Business Settings</h1>
+            <p className="mt-2 text-base text-gray-500">
+              Manage your active business profile and add more locations when you&apos;ve paid for
+              them.
+            </p>
+          </div>
+          {addBusinessButton}
+        </div>
 
         {error && (
           <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -282,14 +320,14 @@ export default function BusinessSettingsPage() {
         <Card className="border-gray-200 bg-white">
           <CardContent className="p-6">
             <p className="text-sm text-gray-600">
-              Kindly contact{" "}
+              Need to replace this business or remove a profile? Contact{" "}
               <a
                 href="mailto:jerry@blazly.ai"
                 className="font-medium text-indigo-600 hover:text-indigo-700"
               >
                 jerry@blazly.ai
-              </a>{" "}
-              to replace or delete business details.
+              </a>
+              .
             </p>
           </CardContent>
         </Card>

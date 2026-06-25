@@ -21,13 +21,13 @@ export default function CitationsPage() {
             <ScoreRing score={c?.score ?? 0} label="Citation Health Score" />
             <div className="flex-1 space-y-4">
               <div>
-                <p className="font-medium text-white">Citation Coverage</p>
-                <p className="text-sm text-[#b8a9d9]">Google: {c?.googleListed ? "Listed" : "Missing"}</p>
-                <p className="text-sm text-[#b8a9d9]">
+                <p className="font-medium text-slate-900">Citation Coverage</p>
+                <p className="text-sm text-slate-500">Google: {c?.googleListed ? "Listed" : "Missing"}</p>
+                <p className="text-sm text-slate-500">
                   Other Directories: {c?.otherDirectories.listed ?? 0}/{c?.otherDirectories.total ?? 0}
                 </p>
               </div>
-              <Link href="/dashboard/competitors/citation-finder" className="text-sm text-violet-300 hover:text-violet-200">
+              <Link href="/dashboard/competitors/citation-finder" className="text-sm text-indigo-600 hover:text-indigo-700">
                 Open Citation Finder →
               </Link>
             </div>
@@ -38,10 +38,10 @@ export default function CitationsPage() {
           <Card>
             <CardHeader><CardTitle>Citation Errors</CardTitle></CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <p className="rounded-xl border border-white/10 bg-white/5 p-3 text-[#d4c4f5]">{c?.errors.missingListings ?? 0} Missing Listings</p>
-              <p className="rounded-xl border border-white/10 bg-white/5 p-3 text-[#d4c4f5]">{c?.errors.duplicateListings ?? 0} Duplicate Listings</p>
-              <p className="rounded-xl border border-white/10 bg-white/5 p-3 text-[#d4c4f5]">{c?.errors.phoneMismatch ?? 0} Phone Mismatches</p>
-              <p className="rounded-xl border border-white/10 bg-white/5 p-3 text-[#d4c4f5]">{c?.errors.addressMismatch ?? 0} Address Mismatches</p>
+              <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-slate-700">{c?.errors.missingListings ?? 0} Missing Listings</p>
+              <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-slate-700">{c?.errors.duplicateListings ?? 0} Duplicate Listings</p>
+              <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-slate-700">{c?.errors.phoneMismatch ?? 0} Phone Mismatches</p>
+              <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-slate-700">{c?.errors.addressMismatch ?? 0} Address Mismatches</p>
             </CardContent>
           </Card>
           <NapConsistencyPanel audit={rankings?.napAudit} />

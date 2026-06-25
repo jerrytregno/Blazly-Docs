@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   CheckCircle2,
   Download,
@@ -8,6 +8,7 @@ import {
   Sparkles,
   AlertTriangle,
 } from "lucide-react";
+import { useAuth } from "@/components/providers/auth-provider";
 import { useData } from "@/components/providers/data-provider";
 import { PageDataGuard } from "@/components/data/page-data-guard";
 import { ImageUploadZone } from "@/components/images/image-upload-zone";
@@ -26,13 +27,44 @@ import {
   exportImageAs,
   fileToBase64,
 } from "@/lib/images/image-analysis";
+import type { ImageEnhancementQuota } from "@/lib/images/enhancement-quota";
 import type { EnhancedImageItem } from "@/types/image-enhance";
 import { cn } from "@/lib/utils";
 
 export default function EnhanceImagesPage() {
+  const { user } = useAuth();
   const { business } = useData();
   const [items, setItems] = useState<EnhancedImageItem[]>([]);
   const [bulkEnhancing, setBulkEnhancing] = useState(false);
+  const [quota, setQuota] = useState<ImageEnhancementQuota | null>(null);
+  const [quotaLoading, setQuotaLoading] = useState(true);
+
+  const loadQuota = useCallback(async () => {
+    if (!user?.uid) {
+      setQuota(null);
+      setQuotaLoading(false);
+      return;
+    }
+
+    setQuotaLoading(true);
+    try {
+      const res = await fetch(`/api/images/enhance?userId=${encodeURIComponent(user.uid)}`);
+      const data = await res.json();
+      if (res.ok) {
+        setQuota(data.quota as ImageEnhancementQuota);
+      }
+    } catch {
+      // quota display is optional; enhancement API still enforces limits
+    } finally {
+      setQuotaLoading(false);
+    }
+  }, [user?.uid]);
+
+  useEffect(() => {
+    void loadQuota();
+  }, [loadQuota, business?.businessId, business?.mapsPlaceId]);
+
+  const atEnhancementLimit = quota != null && !quota.canEnhance;
 
   const addFiles = useCallback(async (files: File[]) => {
     const newItems: EnhancedImageItem[] = [];
@@ -94,9 +126,11 @@ export default function EnhanceImagesPage() {
     setItems((prev) => [...newItems, ...prev]);
   }, []);
 
-  const enhanceOne = async (id: string) => {
+  const enhanceOne = async (id: string): Promise<boolean> => {
     const item = items.find((i) => i.id === id);
-    if (!item || item.status === "enhancing") return;
+    if (!item || item.status === "enhancing") return true;
+    if (!user?.uid) return false;
+    if (quota != null && !quota.canEnhance) return false;
 
     setItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, status: "enhancing", error: undefined } : i))
@@ -107,6 +141,7 @@ export default function EnhanceImagesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          userId: user.uid,
           imageBase64: await fileToBase64(await urlToFile(item.originalUrl, item.fileName, item.mimeType)),
           mimeType: item.mimeType,
           fileName: item.fileName,
@@ -117,7 +152,24 @@ export default function EnhanceImagesPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Enhancement failed");
+      if (!res.ok) {
+        const nextQuota = data.quota as ImageEnhancementQuota | undefined;
+        if (nextQuota) setQuota(nextQuota);
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === id
+              ? {
+                  ...i,
+                  status: "error",
+                  error: data.error ?? "Enhancement failed",
+                }
+              : i
+          )
+        );
+        return res.status !== 429 && (nextQuota?.canEnhance ?? true);
+      }
+
+      if (data.quota) setQuota(data.quota as ImageEnhancementQuota);
 
       const enhancedUrl = `data:${data.enhancedMimeType};base64,${data.enhancedImageBase64}`;
 
@@ -133,6 +185,9 @@ export default function EnhanceImagesPage() {
             : i
         )
       );
+
+      const nextQuota = data.quota as ImageEnhancementQuota | undefined;
+      return nextQuota?.canEnhance ?? true;
     } catch (err) {
       setItems((prev) =>
         prev.map((i) =>
@@ -145,15 +200,18 @@ export default function EnhanceImagesPage() {
             : i
         )
       );
+      return true;
     }
   };
 
   const enhanceBulk = async () => {
+    if (atEnhancementLimit) return;
     const targets = items.filter((i) => i.status === "ready" || i.status === "error");
     if (!targets.length) return;
     setBulkEnhancing(true);
     for (const item of targets) {
-      await enhanceOne(item.id);
+      const canContinue = await enhanceOne(item.id);
+      if (!canContinue) break;
     }
     setBulkEnhancing(false);
   };
@@ -179,7 +237,22 @@ export default function EnhanceImagesPage() {
           <p className="mt-1 text-gray-600">
             Upload Google Business Profile photos, check GBP compliance, and enhance with AI.
           </p>
+          {!quotaLoading && quota && (
+            <p className="mt-2 text-sm text-gray-500">
+              <span className="font-medium text-gray-800">
+                {quota.used} of {quota.limit}
+              </span>{" "}
+              AI enhancements used this month for this business profile
+              {quota.remaining > 0 ? ` (${quota.remaining} remaining).` : "."}
+            </p>
+          )}
         </div>
+
+        {atEnhancementLimit && quota?.limitMessage && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            {quota.limitMessage}
+          </div>
+        )}
 
         <ImageUploadZone onFiles={addFiles} disabled={bulkEnhancing} />
 
@@ -193,7 +266,11 @@ export default function EnhanceImagesPage() {
             </div>
             <Button
               onClick={enhanceBulk}
-              disabled={bulkEnhancing || !items.some((i) => i.status === "ready" || i.status === "error")}
+              disabled={
+                bulkEnhancing ||
+                atEnhancementLimit ||
+                !items.some((i) => i.status === "ready" || i.status === "error")
+              }
               className="gap-2"
             >
               {bulkEnhancing ? (
@@ -280,7 +357,9 @@ export default function EnhanceImagesPage() {
                       <Button
                         size="sm"
                         onClick={() => enhanceOne(item.id)}
-                        disabled={item.status === "enhancing" || bulkEnhancing}
+                        disabled={
+                          item.status === "enhancing" || bulkEnhancing || atEnhancementLimit
+                        }
                         className="gap-2"
                       >
                         {item.status === "enhancing" ? (
