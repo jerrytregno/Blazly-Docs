@@ -61,8 +61,8 @@ export function AuthLayout({
       </div>
 
       <div className="auth-split-brand">
-        <div className="flex w-full max-w-md flex-col items-center">
-          <div className="space-y-8">
+        <div className="flex w-full max-w-md flex-col items-start">
+          <div className="space-y-8 text-left">
             <div>
               <h2 className="text-3xl font-bold leading-tight tracking-tight text-white">
                 Grow your local presence with AI
@@ -72,7 +72,7 @@ export function AuthLayout({
                 reviews into revenue.
               </p>
             </div>
-            <ul className="mx-auto inline-flex flex-col items-start space-y-3 text-left">
+            <ul className="inline-flex flex-col items-start space-y-3 text-left">
               {AUTH_FEATURES.map((feature) => (
                 <li key={feature} className="flex items-center gap-3 text-sm text-slate-300">
                   <CheckCircle2 className="h-5 w-5 shrink-0 text-indigo-400" />
