@@ -1,4 +1,3 @@
-import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
 import {
   currentEnhancementPeriod,
@@ -6,6 +5,11 @@ import {
   resolveImageEnhancementQuota,
   type ImageEnhancementQuota,
 } from "./enhancement-quota";
+
+function getFieldValue() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require("firebase-admin/firestore").FieldValue as typeof import("firebase-admin/firestore").FieldValue;
+}
 
 type ConsumeResult =
   | { ok: true; quota: ImageEnhancementQuota }
@@ -53,7 +57,7 @@ export async function consumeImageEnhancementSlot(userId: string): Promise<Consu
       {
         imageEnhancementsUsed: used,
         imageEnhancementsPeriod: period,
-        updatedAt: FieldValue.serverTimestamp(),
+        updatedAt: getFieldValue().serverTimestamp(),
       },
       { merge: true }
     );
@@ -83,7 +87,7 @@ export async function releaseImageEnhancementSlot(userId: string): Promise<void>
       {
         imageEnhancementsUsed: used - 1,
         imageEnhancementsPeriod: period,
-        updatedAt: FieldValue.serverTimestamp(),
+        updatedAt: getFieldValue().serverTimestamp(),
       },
       { merge: true }
     );

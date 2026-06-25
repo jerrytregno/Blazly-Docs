@@ -1,4 +1,3 @@
-import { FieldValue } from "firebase-admin/firestore";
 import type Stripe from "stripe";
 import { getAdminDb } from "@/lib/firebase-admin";
 
@@ -21,6 +20,11 @@ export interface StripeLogMeta {
 
 const COLLECTION = "stripeLogs";
 
+function firestoreAdmin() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require("firebase-admin/firestore") as typeof import("firebase-admin/firestore");
+}
+
 /** Persist a failed signature verification attempt (no Stripe event id available). */
 export async function logStripeSignatureFailure(
   error: unknown,
@@ -29,6 +33,7 @@ export async function logStripeSignatureFailure(
   const db = getAdminDb();
   if (!db) return;
 
+  const { FieldValue } = firestoreAdmin();
   await db.collection(COLLECTION).add({
     status: "signature_invalid" satisfies StripeLogStatus,
     error: error instanceof Error ? error.message : String(error),
@@ -37,10 +42,6 @@ export async function logStripeSignatureFailure(
   });
 }
 
-/**
- * Store or update a Stripe webhook event in Firestore (`stripeLogs` collection).
- * Uses Stripe's event id as the document id so retries update the same record.
- */
 export async function saveStripeLog(
   event: Stripe.Event,
   status: Exclude<StripeLogStatus, "signature_invalid">,
@@ -49,6 +50,7 @@ export async function saveStripeLog(
   const db = getAdminDb();
   if (!db) return;
 
+  const { FieldValue } = firestoreAdmin();
   const record: Record<string, unknown> = {
     eventId: event.id,
     type: event.type,
@@ -74,7 +76,6 @@ export async function saveStripeLog(
   await db.collection(COLLECTION).doc(event.id).set(record, { merge: true });
 }
 
-/** Persist a checkout API failure (before Stripe redirects the user). */
 export async function logStripeCheckoutError(input: {
   firebaseUid?: string;
   quantity?: number;
@@ -84,6 +85,7 @@ export async function logStripeCheckoutError(input: {
   const db = getAdminDb();
   if (!db) return;
 
+  const { FieldValue } = firestoreAdmin();
   const message =
     input.error instanceof Error ? input.error.message : String(input.error);
   const stripeCode =

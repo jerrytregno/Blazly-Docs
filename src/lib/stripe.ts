@@ -1,4 +1,4 @@
-import Stripe from "stripe";
+import type Stripe from "stripe";
 
 let cached: Stripe | null = null;
 
@@ -7,11 +7,15 @@ export function getStripe(): Stripe | null {
   if (cached) return cached;
   const key = process.env.STRIPE_SECRET_KEY;
   if (!key?.trim()) return null;
-  cached = new Stripe(key.trim());
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const StripeConstructor = require("stripe") as typeof import("stripe").default;
+  cached = new StripeConstructor(key.trim());
   return cached;
 }
 
-export const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID ?? "";
+export function getStripePriceId(): string {
+  return process.env.STRIPE_PRICE_ID?.trim() ?? "";
+}
 
 type UrlRequest = { headers: Headers };
 
@@ -30,13 +34,21 @@ export function getAppUrl(request?: UrlRequest): string {
   const proto = request?.headers.get("x-forwarded-proto")?.trim() ?? "https";
   if (host) return `${proto}://${host}`.replace(/\/$/, "");
 
-  throw new Error(
-    "Could not determine app URL. Set NEXT_PUBLIC_APP_URL in your environment (e.g. https://localseo.blazly.ai), then redeploy."
+  return "https://localseo.blazly.ai";
+}
+
+function isStripeError(error: unknown): error is Stripe.errors.StripeError {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "type" in error &&
+    typeof (error as { type?: unknown }).type === "string" &&
+    (error as { type: string }).type.startsWith("Stripe")
   );
 }
 
 export function stripeErrorMessage(error: unknown): string {
-  if (error instanceof Stripe.errors.StripeError) {
+  if (isStripeError(error)) {
     if (error.code === "resource_missing") {
       return "Stripe configuration error: price or customer not found. Check live-mode STRIPE_PRICE_ID and customer IDs.";
     }
@@ -47,9 +59,5 @@ export function stripeErrorMessage(error: unknown): string {
 }
 
 export function isMissingStripeCustomerError(error: unknown): boolean {
-  return (
-    error instanceof Stripe.errors.StripeError &&
-    error.code === "resource_missing" &&
-    error.param === "customer"
-  );
+  return isStripeError(error) && error.code === "resource_missing" && error.param === "customer";
 }

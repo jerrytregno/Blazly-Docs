@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type Stripe from "stripe";
 import {
   getStripe,
-  STRIPE_PRICE_ID,
+  getStripePriceId,
   getAppUrl,
   isMissingStripeCustomerError,
   stripeErrorMessage,
@@ -39,7 +39,8 @@ export async function POST(request: NextRequest) {
     quantity = Math.min(10, Math.max(1, Math.floor(rawQuantity ?? 1)));
 
     const stripe = getStripe();
-    if (!stripe || !STRIPE_PRICE_ID) {
+    const priceId = getStripePriceId();
+    if (!stripe || !priceId) {
       return NextResponse.json(
         { error: "Payments are not configured on the server." },
         { status: 503 }
@@ -74,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     const baseParams: CheckoutParams = {
       mode: "subscription",
-      line_items: [{ price: STRIPE_PRICE_ID, quantity }],
+      line_items: [{ price: priceId, quantity }],
       client_reference_id: uid,
       metadata: { firebaseUid: uid, businessQuantity: String(quantity) },
       subscription_data: { metadata: { firebaseUid: uid } },
