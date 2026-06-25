@@ -5,7 +5,9 @@ import { getFirestore } from "firebase/firestore";
 function requiredPublicEnv(name: string): string {
   const value = process.env[name];
   if (!value?.trim()) {
-    throw new Error(`${name} is not configured. Add it to .env.local`);
+    throw new Error(
+      `${name} is not configured. Set it in your environment (local: .env.local, Vercel: Project Settings → Environment Variables), then redeploy.`
+    );
   }
   return value.trim();
 }

@@ -16,7 +16,9 @@ export const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID ?? "";
 export function getAppUrl(): string {
   const base = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (!base) {
-    throw new Error("NEXT_PUBLIC_APP_URL is not configured. Add it to .env.local");
+    throw new Error(
+      "NEXT_PUBLIC_APP_URL is not configured. Set it in your environment (e.g. https://localseo.blazly.ai on Vercel), then redeploy."
+    );
   }
   return base.replace(/\/$/, "");
 }
