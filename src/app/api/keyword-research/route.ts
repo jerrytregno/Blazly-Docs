@@ -7,6 +7,7 @@ import {
   updateKeywordResearch,
 } from "@/lib/firestore/collections";
 import { buildKeywordResearchReport } from "@/lib/keyword-research/build-report";
+import { getRankSearchCooldownState } from "@/lib/seo/analysis-cooldown";
 import { resolveSearchLocation } from "@/lib/seo/analysis-location";
 import { regionGl, resolveSearchRegionId } from "@/lib/seo/search-regions";
 
@@ -51,6 +52,16 @@ export async function POST(request: NextRequest) {
     }
 
     const uid = userId.trim();
+    const existing = await getKeywordResearch(uid);
+    const isCompetitorOnly = Boolean(competitorPlaceId?.trim());
+
+    if (!isCompetitorOnly) {
+      const cooldown = getRankSearchCooldownState(existing.analyzedAt);
+      if (!cooldown.canRun) {
+        return NextResponse.json({ error: cooldown.message }, { status: 429 });
+      }
+    }
+
     const [business, dashboard, profileOptimization] = await Promise.all([
       getBusiness(uid),
       getDashboard(uid),
@@ -81,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     const payload = {
       report,
-      analyzedAt: new Date().toISOString(),
+      analyzedAt: isCompetitorOnly ? existing.analyzedAt : new Date().toISOString(),
       error: null,
     };
 

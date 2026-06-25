@@ -11,12 +11,14 @@ import { cn } from "@/lib/utils";
 import { parseGoogleMapsPlaceId } from "@/lib/seo/maps-place";
 import {
   canLoadMoreUnansweredReviews,
+  canRefreshUnansweredReviews,
+  isReviewWeeklyLimitReached,
   type FetchReviewsProgress,
 } from "@/lib/seo/client";
+import { getReviewLoadCooldownState } from "@/lib/seo/analysis-cooldown";
 import {
   MAX_UNANSWERED_BATCHES,
   MAX_UNANSWERED_REVIEWS,
-  UNANSWERED_BATCH_SIZE,
   reviewHasWrittenText,
 } from "@/lib/seo/real-data";
 
@@ -50,7 +52,16 @@ export default function ReviewManagementPage() {
     reviews?.totalOnGoogle ?? dashboard?.metrics.totalReviews ?? inbox.length;
   const batchesLoaded = reviews?.unansweredBatchesLoaded ?? 0;
   const canLoadMore = canLoadMoreUnansweredReviews(reviews);
-  const batchesRemaining = Math.max(0, MAX_UNANSWERED_BATCHES - batchesLoaded);
+  const canRefresh = canRefreshUnansweredReviews(reviews);
+  const reviewCooldown = useMemo(
+    () => getReviewLoadCooldownState(reviews?.fetchedAt),
+    [reviews?.fetchedAt]
+  );
+  const atWeeklyLimit = isReviewWeeklyLimitReached(reviews);
+  const showWeeklyMessage =
+    Boolean(reviews?.fetchedAt) &&
+    !reviewCooldown.canRun &&
+    (atWeeklyLimit || !canLoadMore);
 
   const needsInitialFetch = useMemo(() => {
     if (!hasMapsLink) return false;
@@ -131,8 +142,8 @@ export default function ReviewManagementPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Review Management</h1>
             <p className="mt-1 text-gray-600">
-              Loads the latest {UNANSWERED_BATCH_SIZE} unanswered written reviews at a time (up to{" "}
-              {MAX_UNANSWERED_REVIEWS}). Reply with AI and post on Google Business Profile.
+              Loads up to {MAX_UNANSWERED_REVIEWS} unanswered written reviews from Google. Reply
+              with AI and post on Google Business Profile.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -145,13 +156,13 @@ export default function ReviewManagementPage() {
                 {loadingMore ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : null}
-                Load next {UNANSWERED_BATCH_SIZE} unanswered
+                Load more unanswered
               </Button>
             )}
             <Button
               variant="outline"
               onClick={handleRefresh}
-              disabled={busy || !hasMapsLink}
+              disabled={busy || !hasMapsLink || !canRefresh}
               className="gap-2"
             >
               {refreshing ? (
@@ -159,10 +170,14 @@ export default function ReviewManagementPage() {
               ) : (
                 <RefreshCw className="h-4 w-4" />
               )}
-              {refreshing ? "Refreshing…" : "Refresh latest 20"}
+              {refreshing ? "Refreshing…" : `Refresh latest ${MAX_UNANSWERED_REVIEWS}`}
             </Button>
           </div>
         </div>
+
+        {showWeeklyMessage && reviewCooldown.message && (
+          <p className="text-sm text-amber-700">{reviewCooldown.message}</p>
+        )}
 
         {!hasMapsLink && (
           <Card className="border-amber-200 bg-amber-50">
@@ -246,9 +261,9 @@ export default function ReviewManagementPage() {
           <Card className="border-gray-200 bg-white">
             <CardContent className="flex flex-col items-center justify-center py-20 text-center">
               <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
-              <p className="mt-4 font-medium text-gray-900">Loading latest unanswered reviews</p>
+              <p className="mt-4 font-medium text-gray-900">Loading unanswered reviews</p>
               <p className="mt-1 text-sm text-gray-500">
-                Fetching up to {UNANSWERED_BATCH_SIZE} newest written reviews without owner replies
+                Fetching up to {MAX_UNANSWERED_REVIEWS} newest written reviews without owner replies
               </p>
             </CardContent>
           </Card>
@@ -264,7 +279,7 @@ export default function ReviewManagementPage() {
               </p>
               {hasMapsLink && canLoadMore && (
                 <Button className="mt-6" onClick={handleLoadMore} disabled={busy}>
-                  Load next {UNANSWERED_BATCH_SIZE} unanswered
+                  Load more unanswered
                 </Button>
               )}
             </CardContent>
@@ -290,7 +305,7 @@ export default function ReviewManagementPage() {
                   {loadingMore ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : null}
-                  Load next {UNANSWERED_BATCH_SIZE}
+                  Load more unanswered
                 </Button>
               )}
             </div>
@@ -317,12 +332,14 @@ export default function ReviewManagementPage() {
                   {loadingMore ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : null}
-                  Load next {UNANSWERED_BATCH_SIZE} unanswered
+                  Load more unanswered
                 </Button>
                 <p className="text-xs text-gray-500">
-                  {batchesRemaining} more batch{batchesRemaining === 1 ? "" : "es"} available
+                  {canLoadMore
+                    ? "More unanswered written reviews are available on Google."
+                    : ""}
                   {fetchProgress && loadingMore
-                    ? ` · scanned ${fetchProgress.scanned} on Google`
+                    ? `${canLoadMore ? " · " : ""}Scanned ${fetchProgress.scanned} on Google`
                     : ""}
                 </p>
               </div>
@@ -330,11 +347,13 @@ export default function ReviewManagementPage() {
 
             {!canLoadMore && batchesLoaded > 0 && (
               <p className="text-center text-xs text-gray-500">
-                {unansweredWritten.length >= MAX_UNANSWERED_REVIEWS
-                  ? `Showing the maximum of ${MAX_UNANSWERED_REVIEWS} unanswered written reviews.`
-                  : batchesLoaded >= MAX_UNANSWERED_BATCHES
-                    ? "All 5 batches loaded. Refresh to start over from the newest reviews."
-                    : "No more unanswered written reviews to load from Google."}
+                {showWeeklyMessage
+                  ? reviewCooldown.message
+                  : unansweredWritten.length >= MAX_UNANSWERED_REVIEWS
+                    ? `Showing the maximum of ${MAX_UNANSWERED_REVIEWS} unanswered written reviews.`
+                    : batchesLoaded >= MAX_UNANSWERED_BATCHES
+                      ? "All 5 batches loaded. After 1 week you can refresh to load the next 100 unanswered reviews."
+                      : "No more unanswered written reviews to load from Google."}
               </p>
             )}
           </section>

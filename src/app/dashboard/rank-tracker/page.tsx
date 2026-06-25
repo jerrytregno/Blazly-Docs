@@ -15,6 +15,7 @@ import { StrategySection } from "@/components/keyword-research/strategy-section"
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { buildSearchQuery } from "@/lib/keyword-research/fetch-rankings";
+import { getRankSearchCooldownState } from "@/lib/seo/analysis-cooldown";
 import { resolveSearchLocation } from "@/lib/seo/analysis-location";
 import type {
   KeywordResearchDoc,
@@ -47,6 +48,7 @@ export default function RankTrackerPage() {
   const [competitorLoading, setCompetitorLoading] = useState(false);
   const [strategyLoading, setStrategyLoading] = useState(false);
   const [error, setError] = useState("");
+  const [lastSearchedAt, setLastSearchedAt] = useState<string | null>(null);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | undefined>();
   const lastSearchKey = useRef("");
 
@@ -67,6 +69,10 @@ export default function RankTrackerPage() {
   const activeCategory = category.trim();
   const activeLocation = location.trim();
   const canSearch = Boolean(activeCategory && activeLocation);
+  const searchCooldown = useMemo(
+    () => getRankSearchCooldownState(lastSearchedAt),
+    [lastSearchedAt]
+  );
   const searchHeading = canSearch
     ? buildSearchQuery(activeCategory, activeLocation)
     : "";
@@ -86,7 +92,12 @@ export default function RankTrackerPage() {
       if (!searchLocation || !searchCategory) return;
 
       const searchKey = `${searchCategory}|${searchLocation}`;
-      if (!opts?.force && !opts?.competitorPlaceId && searchKey === lastSearchKey.current) {
+      const isCompetitorOnly = Boolean(opts?.competitorPlaceId);
+      if (!opts?.force && !isCompetitorOnly && searchKey === lastSearchKey.current) {
+        return;
+      }
+
+      if (!isCompetitorOnly && !searchCooldown.canRun) {
         return;
       }
 
@@ -108,8 +119,9 @@ export default function RankTrackerPage() {
         if (!res.ok) throw new Error(data.error ?? "Search failed");
 
         setReport(data.report);
-        if (!opts?.competitorPlaceId) {
+        if (!isCompetitorOnly) {
           lastSearchKey.current = searchKey;
+          if (data.analyzedAt) setLastSearchedAt(data.analyzedAt);
         }
         if (data.report?.competitorDetail?.placeId) {
           setSelectedPlaceId(data.report.competitorDetail.placeId);
@@ -121,7 +133,7 @@ export default function RankTrackerPage() {
         setCompetitorLoading(false);
       }
     },
-    [user, activeCategory, activeLocation]
+    [user, activeCategory, activeLocation, searchCooldown.canRun]
   );
 
   const loadStored = useCallback(async () => {
@@ -131,6 +143,7 @@ export default function RankTrackerPage() {
       const res = await fetch(`/api/keyword-research?userId=${user.uid}`);
       if (!res.ok) return;
       const data = (await res.json()) as KeywordResearchDoc;
+      if (data.analyzedAt) setLastSearchedAt(data.analyzedAt);
       if (data.report) {
         setReport(data.report);
         setCategory(data.report.category);
@@ -164,6 +177,10 @@ export default function RankTrackerPage() {
       setError("Enter both category and location, then click Search.");
       return;
     }
+    if (!searchCooldown.canRun) {
+      setError(searchCooldown.message ?? "");
+      return;
+    }
     setError("");
     void runSearch({
       category: activeCategory,
@@ -175,6 +192,10 @@ export default function RankTrackerPage() {
   const handleRefresh = () => {
     if (!activeCategory || !activeLocation) {
       setError("Enter both category and location, then click Search.");
+      return;
+    }
+    if (!searchCooldown.canRun) {
+      setError(searchCooldown.message ?? "");
       return;
     }
     void runSearch({ category: activeCategory, location: activeLocation, force: true });
@@ -239,7 +260,7 @@ export default function RankTrackerPage() {
           <Button
             variant="outline"
             onClick={handleRefresh}
-            disabled={busy || !canSearch}
+            disabled={busy || !canSearch || !searchCooldown.canRun}
             className="gap-2"
           >
             {searching ? (
@@ -261,6 +282,8 @@ export default function RankTrackerPage() {
               onSearch={handleSearch}
               searching={searching}
               disabled={busy}
+              canRunSearch={searchCooldown.canRun}
+              cooldownMessage={searchCooldown.message}
             />
           </CardContent>
         </Card>

@@ -1,17 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   KeyRound,
   Loader2,
-  LogOut,
-  MonitorSmartphone,
   Shield,
 } from "lucide-react";
 import type { User } from "firebase/auth";
-import { useAuth } from "@/components/providers/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,16 +20,13 @@ import {
   hasEmailPasswordProvider,
   hasGoogleProvider,
   sendAccountPasswordReset,
-  signOutAllDevices,
 } from "@/lib/account-security";
 import { getFirebaseAuthErrorMessage } from "@/lib/auth-errors";
 import { cn } from "@/lib/utils";
 
-type Panel = "password" | "signout" | null;
+type Panel = "password" | null;
 
 export function SecurityPanel({ user }: { user: User }) {
-  const { logout } = useAuth();
-  const router = useRouter();
   const [openPanel, setOpenPanel] = useState<Panel>(null);
   const [loading, setLoading] = useState(false);
 
@@ -97,29 +90,6 @@ export function SecurityPanel({ user }: { user: User }) {
     }
   };
 
-  const handleSignOutAll = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const revokedAll = await signOutAllDevices(
-        user,
-        hasPassword ? currentPassword : undefined
-      );
-      await logout();
-      router.replace("/login");
-      showToast(
-        "success",
-        revokedAll
-          ? "Signed out from all devices."
-          : "Signed out on this device."
-      );
-    } catch (err) {
-      showToast("error", getFirebaseAuthErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const rows: { id: Panel; label: string; description: string; icon: typeof KeyRound }[] =
     [
       {
@@ -131,12 +101,6 @@ export function SecurityPanel({ user }: { user: User }) {
             ? "Add a password so you can also sign in with email."
             : "Create a password for your account.",
         icon: KeyRound,
-      },
-      {
-        id: "signout",
-        label: "Sign Out from All Devices",
-        description: "End active sessions on every device and browser.",
-        icon: MonitorSmartphone,
       },
     ];
 
@@ -277,53 +241,6 @@ export function SecurityPanel({ user }: { user: User }) {
                       </Button>
                     )}
                   </div>
-                </form>
-              )}
-
-              {isOpen && row.id === "signout" && (
-                <form
-                  onSubmit={handleSignOutAll}
-                  className="space-y-4 border-t border-gray-200 bg-white p-4"
-                >
-                  <p className="text-sm text-gray-600">
-                    {hasGoogle
-                      ? "Confirm your identity with Google to sign out everywhere."
-                      : "Enter your password to sign out on all devices."}
-                  </p>
-
-                  {hasPassword && (
-                    <div className="space-y-2">
-                      <Label htmlFor="signoutPassword">
-                        Current password{" "}
-                        {hasGoogle && (
-                          <span className="font-normal text-gray-400">
-                            (optional — use Google verify instead)
-                          </span>
-                        )}
-                      </Label>
-                      <Input
-                        id="signoutPassword"
-                        type="password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        autoComplete="current-password"
-                      />
-                    </div>
-                  )}
-
-                  <Button
-                    type="submit"
-                    variant="destructive"
-                    disabled={loading}
-                    className="gap-2"
-                  >
-                    {loading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <LogOut className="h-4 w-4" />
-                    )}
-                    Sign out from all devices
-                  </Button>
                 </form>
               )}
             </div>

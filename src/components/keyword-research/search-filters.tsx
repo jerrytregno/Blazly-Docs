@@ -13,6 +13,8 @@ export function KeywordResearchFilters({
   onSearch,
   searching,
   disabled,
+  canRunSearch = true,
+  cooldownMessage,
 }: {
   category: string;
   location: string;
@@ -21,11 +23,15 @@ export function KeywordResearchFilters({
   onSearch: () => void;
   searching?: boolean;
   disabled?: boolean;
+  canRunSearch?: boolean;
+  cooldownMessage?: string | null;
 }) {
-  const canSearch = Boolean(category.trim() && location.trim());
+  const fieldsReady = Boolean(category.trim() && location.trim());
+  const canSearch = fieldsReady && canRunSearch;
 
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+    <div className="space-y-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
       <div className="min-w-0 flex-1 space-y-2">
         <Label htmlFor="kr-category">Category</Label>
         <Input
@@ -67,6 +73,11 @@ export function KeywordResearchFilters({
         )}
         Search
       </Button>
+      </div>
+
+      {!canRunSearch && cooldownMessage && (
+        <p className="text-sm text-amber-700">{cooldownMessage}</p>
+      )}
     </div>
   );
 }

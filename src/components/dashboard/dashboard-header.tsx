@@ -19,11 +19,15 @@ export function DashboardHeader({
   business,
   analyzing,
   lastAnalyzedAt,
+  canRerunAnalysis = true,
+  analysisCooldownMessage,
   onRefresh,
 }: {
   business: BusinessDoc | null;
   analyzing: boolean;
   lastAnalyzedAt?: string | null;
+  canRerunAnalysis?: boolean;
+  analysisCooldownMessage?: string | null;
   onRefresh: () => void;
 }) {
   const businessName = business?.name?.trim() || "Your business";
@@ -73,8 +77,12 @@ export function DashboardHeader({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button onClick={onRefresh} disabled={analyzing} className="gap-2">
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <Button
+            onClick={onRefresh}
+            disabled={analyzing || !canRerunAnalysis}
+            className="gap-2"
+          >
             {analyzing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -82,6 +90,11 @@ export function DashboardHeader({
             )}
             {analyzing ? "Analyzing…" : "Run analysis"}
           </Button>
+          {!canRerunAnalysis && analysisCooldownMessage && (
+            <p className="max-w-xs text-xs text-amber-700 sm:text-right">
+              {analysisCooldownMessage}
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -1,5 +1,10 @@
 import type { LocalBusiness } from "@/types";
-import type { Competitor, CompetitionAnalysis, CompetitionLevel } from "@/types/firestore";
+import type { Competitor, CompetitionAnalysis, CompetitionLevel, RankingsDoc } from "@/types/firestore";
+import type { BusinessDoc } from "@/types/firestore";
+
+function norm(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
 
 function clamp(n: number, min = 0, max = 100) {
   return Math.round(Math.max(min, Math.min(max, n)));
@@ -195,6 +200,70 @@ export function competitionFromCompetitors(
   }
 
   return analysis;
+}
+
+/** True when stored competition analysis matches the active business context. */
+export function matchesCompetitionContext(
+  analysis: CompetitionAnalysis | undefined,
+  businessName: string,
+  category: string,
+  location: string
+): boolean {
+  if (!analysis) return false;
+  if (norm(analysis.businessName) !== norm(businessName)) return false;
+  if (norm(analysis.category) !== norm(category)) return false;
+  if (norm(analysis.location) !== norm(location)) return false;
+  return true;
+}
+
+/** True when the competitor list includes a "you" row for the current business. */
+export function matchesCompetitorsBusiness(
+  competitors: Competitor[],
+  businessName: string
+): boolean {
+  const you = competitors.find((c) => c.isYou);
+  if (!you) return false;
+  return norm(you.name) === norm(businessName);
+}
+
+export function isCompetitionDataCurrent(
+  rankings: RankingsDoc | null | undefined,
+  businessName: string,
+  category: string,
+  location: string
+): boolean {
+  if (
+    matchesCompetitionContext(rankings?.competitionAnalysis, businessName, category, location)
+  ) {
+    return true;
+  }
+  const competitors = rankings?.competitors ?? [];
+  return competitors.length > 0 && matchesCompetitorsBusiness(competitors, businessName);
+}
+
+export function resolveCompetitionAnalysis(
+  rankings: RankingsDoc | null | undefined,
+  business: BusinessDoc | null | undefined,
+  category: string,
+  location: string
+): CompetitionAnalysis | null {
+  const businessName = business?.name ?? "Your business";
+
+  if (!isCompetitionDataCurrent(rankings, businessName, category, location)) {
+    return null;
+  }
+
+  const stored = rankings?.competitionAnalysis;
+  if (stored && matchesCompetitionContext(stored, businessName, category, location)) {
+    return stored;
+  }
+
+  const competitors = rankings?.competitors ?? [];
+  if (competitors.length) {
+    return competitionFromCompetitors(competitors, category, location, businessName);
+  }
+
+  return null;
 }
 
 export const COMPETITION_LEVEL_STYLES: Record<

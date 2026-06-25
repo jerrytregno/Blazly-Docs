@@ -18,6 +18,8 @@ export default function DashboardPage() {
     profileOptimization,
     analyzing,
     analysisError,
+    canRerunAnalysis,
+    analysisCooldownMessage,
     runAnalysis,
   } = useData();
 
@@ -32,6 +34,8 @@ export default function DashboardPage() {
           business={business}
           analyzing={!!isAnalyzing}
           lastAnalyzedAt={dashboard?.lastAnalyzedAt}
+          canRerunAnalysis={canRerunAnalysis}
+          analysisCooldownMessage={analysisCooldownMessage}
           onRefresh={() => runAnalysis()}
         />
 
@@ -90,7 +94,8 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => runAnalysis()}
-                  className="underline"
+                  disabled={!canRerunAnalysis}
+                  className="underline disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50"
                 >
                   refresh analysis
                 </button>{" "}

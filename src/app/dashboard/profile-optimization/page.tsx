@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Building2,
+  CheckCircle2,
   Clock,
   Globe,
   Loader2,
@@ -67,6 +68,7 @@ export default function ProfileOptimizationPage() {
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
+  const [enhanceComplete, setEnhanceComplete] = useState(false);
   const [error, setError] = useState("");
   const lastFetchedKey = useRef("");
   const autoFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -79,6 +81,7 @@ export default function ProfileOptimizationPage() {
 
       const mapsKey = normalizeMapsKey(trimmed);
       setAnalyzing(true);
+      setEnhanceComplete(false);
       setError("");
       try {
         const res = await fetch("/api/profile/analyze", {
@@ -186,6 +189,7 @@ export default function ProfileOptimizationPage() {
   const handleEnhance = async () => {
     if (!user) return;
     setEnhancing(true);
+    setEnhanceComplete(false);
     setError("");
     try {
       const res = await fetch("/api/profile/enhance", {
@@ -199,6 +203,7 @@ export default function ProfileOptimizationPage() {
         prev ? { ...prev, enhancement: data.enhancement as ProfileEnhancement } : prev
       );
       await saveProfileOptimization({ enhancement: data.enhancement });
+      setEnhanceComplete(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Enhancement failed");
     } finally {
@@ -239,7 +244,7 @@ export default function ProfileOptimizationPage() {
                 Paste your Google Maps link — profile details fetch automatically.
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Button onClick={handleAnalyze} disabled={analyzing || enhancing || !mapsLink.trim()}>
                 {analyzing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -249,19 +254,27 @@ export default function ProfileOptimizationPage() {
                 {analyzing ? "Fetching profile…" : "Refresh profile"}
               </Button>
               {showProfile && (
-                <Button
-                  variant="outline"
-                  onClick={handleEnhance}
-                  disabled={enhancing || analyzing}
-                  className="gap-2 border-violet-200 text-violet-700 hover:bg-violet-50"
-                >
-                  {enhancing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4" />
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={handleEnhance}
+                    disabled={enhancing || analyzing}
+                    className="gap-2 border-violet-200 text-violet-700 hover:bg-violet-50"
+                  >
+                    {enhancing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                    {enhancing ? "Generating…" : "Enhance Profile"}
+                  </Button>
+                  {enhanceComplete && !enhancing && (
+                    <p className="flex items-center gap-1.5 text-sm text-emerald-700">
+                      <CheckCircle2 className="h-4 w-4 shrink-0" />
+                      Completed — you can view the results below.
+                    </p>
                   )}
-                  {enhancing ? "Generating…" : "Enhance Profile"}
-                </Button>
+                </>
               )}
             </div>
             {error && (

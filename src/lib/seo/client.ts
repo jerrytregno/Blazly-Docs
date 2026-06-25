@@ -10,6 +10,7 @@ import {
   MAX_UNANSWERED_REVIEWS,
   reviewHasWrittenText,
 } from "@/lib/seo/real-data";
+import { getReviewLoadCooldownState } from "@/lib/seo/analysis-cooldown";
 
 export interface AnalyzeResponse {
   business: Partial<BusinessDoc>;
@@ -42,6 +43,33 @@ export async function fetchSeoAnalysis(input: {
   return data as AnalyzeResponse;
 }
 
+export interface CompetitionScanResponse {
+  competitors: RankingsDoc["competitors"];
+  competitionAnalysis: NonNullable<RankingsDoc["competitionAnalysis"]>;
+}
+
+export async function fetchCompetitionScan(input: {
+  businessName: string;
+  website?: string;
+  category?: string;
+  location?: string;
+  phone?: string;
+  mapsPlaceId?: string;
+  searchRegion?: string;
+}): Promise<CompetitionScanResponse> {
+  const res = await fetch("/api/competitors/scan", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.error ?? "Competition scan failed");
+  }
+  return data as CompetitionScanResponse;
+}
+
 export interface FetchReviewsProgress {
   scanned: number;
   unanswered: number;
@@ -72,6 +100,8 @@ export async function fetchUnansweredReviews(input: {
   nextPageToken?: string;
   existingReviewIds?: string[];
   unansweredBatchesLoaded?: number;
+  fetchedAt?: string;
+  currentUnansweredCount?: number;
   onProgress?: (progress: FetchReviewsProgress) => void;
 }): Promise<FetchUnansweredReviewsResponse> {
   const res = await fetch("/api/reviews/fetch", {
@@ -85,6 +115,8 @@ export async function fetchUnansweredReviews(input: {
       nextPageToken: input.reset ? undefined : input.nextPageToken,
       existingReviewIds: input.reset ? [] : input.existingReviewIds ?? [],
       unansweredBatchesLoaded: input.reset ? 0 : input.unansweredBatchesLoaded ?? 0,
+      fetchedAt: input.fetchedAt,
+      currentUnansweredCount: input.reset ? 0 : input.currentUnansweredCount,
     }),
   });
 
@@ -106,11 +138,24 @@ export async function fetchUnansweredReviews(input: {
 
 export function canLoadMoreUnansweredReviews(reviews: ReviewsDoc | null): boolean {
   if (!reviews) return false;
-  const batches = reviews.unansweredBatchesLoaded ?? 0;
   const unanswered = reviews.inbox.filter(
     (r) => !r.replied && reviewHasWrittenText(r.text)
   ).length;
-  if (batches >= MAX_UNANSWERED_BATCHES) return false;
   if (unanswered >= MAX_UNANSWERED_REVIEWS) return false;
-  return true;
+  return Boolean(reviews.nextPageToken);
+}
+
+export function canRefreshUnansweredReviews(reviews: ReviewsDoc | null): boolean {
+  if (!reviews?.fetchedAt) return true;
+  if ((reviews.unansweredBatchesLoaded ?? 0) === 0) return true;
+  return getReviewLoadCooldownState(reviews.fetchedAt).canRun;
+}
+
+export function isReviewWeeklyLimitReached(reviews: ReviewsDoc | null): boolean {
+  if (!reviews) return false;
+  const unanswered = reviews.inbox.filter(
+    (r) => !r.replied && reviewHasWrittenText(r.text)
+  ).length;
+  if (unanswered >= MAX_UNANSWERED_REVIEWS) return true;
+  return (reviews.unansweredBatchesLoaded ?? 0) >= MAX_UNANSWERED_BATCHES && !reviews.nextPageToken;
 }

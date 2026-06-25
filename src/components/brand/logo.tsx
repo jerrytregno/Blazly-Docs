@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-/** Trimmed PNG exported from the official Blazly lightning bolt artwork */
-export const BRAND_LOGO_SRC = "/blazly-logo-mark.png";
-export const BRAND_LOGO_ASPECT = 434 / 578;
+/** Blazly Local SEO brand mark — https://kommodo.ai/i/oWxwdC81280OzErhStVe */
+export const BRAND_LOGO_SRC =
+  "https://plain-apac-prod-public.komododecks.com/202606/25/oWxwdC81280OzErhStVe/image.png";
 
 export function BrandLogo({
   href = "/",
@@ -20,7 +20,6 @@ export function BrandLogo({
 }) {
   const markHeight =
     size === "sm" ? 34 : size === "lg" ? 48 : showTagline ? 42 : 38;
-  const markWidth = Math.round(markHeight * BRAND_LOGO_ASPECT);
   const titleClass =
     size === "lg" ? "text-xl font-bold" : size === "sm" ? "text-sm font-semibold" : "text-base font-bold";
   const taglineClass =
@@ -34,11 +33,11 @@ export function BrandLogo({
     <div className={cn("flex items-center gap-3", className)}>
       <img
         src={BRAND_LOGO_SRC}
-        alt="Blazly"
-        width={markWidth}
+        alt="Blazly Local SEO"
+        width={markHeight}
         height={markHeight}
-        className="shrink-0 object-contain"
-        style={{ height: markHeight, width: markWidth }}
+        className="shrink-0 rounded-lg object-contain"
+        style={{ height: markHeight, width: markHeight }}
         decoding="async"
       />
       <div>

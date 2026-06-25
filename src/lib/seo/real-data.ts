@@ -127,6 +127,8 @@ export const UNANSWERED_BATCH_SIZE = 20;
 export const MAX_UNANSWERED_BATCHES = 5;
 export const MAX_UNANSWERED_REVIEWS = 100;
 const MAX_PAGES_PER_UNANSWERED_BATCH = 15;
+/** Max Google review pages to scan when loading the full 100 unanswered written reviews */
+const MAX_PAGES_FULL_LOAD = 200;
 
 function reviewStableId(r: GoogleMapsReview, placeId: string, index: number): string {
   return r.review_id ?? `${placeId}-${index}`;
@@ -141,7 +143,7 @@ function extractNextReviewPageToken(
   );
 }
 
-/** Fetch up to 20 new unanswered reviews (one user batch). */
+/** Fetch unanswered written reviews (default 20 per call; up to 100 on full load). */
 export async function fetchUnansweredReviewsBatch(
   placeId: string,
   options: {
@@ -149,9 +151,13 @@ export async function fetchUnansweredReviewsBatch(
     nextPageToken?: string;
     existingIds?: string[];
     targetCount?: number;
+    maxPages?: number;
   } = {}
 ): Promise<FetchGoogleReviewsResult> {
   const target = options.targetCount ?? UNANSWERED_BATCH_SIZE;
+  const pageLimit =
+    options.maxPages ??
+    (target > UNANSWERED_BATCH_SIZE ? MAX_PAGES_FULL_LOAD : MAX_PAGES_PER_UNANSWERED_BATCH);
   const seen = new Set(options.existingIds ?? []);
   const batchUnanswered: GoogleMapsReview[] = [];
   let nextToken = options.nextPageToken;
@@ -163,7 +169,7 @@ export async function fetchUnansweredReviewsBatch(
 
   while (
     batchUnanswered.length < target &&
-    pagesFetched < MAX_PAGES_PER_UNANSWERED_BATCH
+    pagesFetched < pageLimit
   ) {
     const data = await fetchGoogleMapsReviews(placeId, {
       sort_by: "newest",

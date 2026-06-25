@@ -21,8 +21,8 @@ export const metadata: Metadata = {
   description:
     "AI-powered local SEO platform for Google Maps visibility, competitor analysis, rank tracking, and review management.",
   icons: {
-    icon: "/blazly-logo-mark.png",
-    apple: "/blazly-logo-mark.png",
+    icon: "/blazly-local-seo-logo.png",
+    apple: "/blazly-local-seo-logo.png",
   },
 };
 

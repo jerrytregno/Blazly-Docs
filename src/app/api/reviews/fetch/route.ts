@@ -4,7 +4,9 @@ import {
   fetchUnansweredReviewsBatch,
   MAX_UNANSWERED_BATCHES,
   MAX_UNANSWERED_REVIEWS,
+  UNANSWERED_BATCH_SIZE,
 } from "@/lib/seo/real-data";
+import { getReviewLoadCooldownState } from "@/lib/seo/analysis-cooldown";
 import { regionGl } from "@/lib/seo/search-regions";
 
 export const maxDuration = 120;
@@ -20,6 +22,8 @@ export async function POST(request: NextRequest) {
       nextPageToken,
       existingReviewIds,
       unansweredBatchesLoaded,
+      fetchedAt,
+      currentUnansweredCount,
     } = body as {
       mapsPlaceId?: string;
       searchRegion?: string;
@@ -28,6 +32,8 @@ export async function POST(request: NextRequest) {
       nextPageToken?: string;
       existingReviewIds?: string[];
       unansweredBatchesLoaded?: number;
+      fetchedAt?: string;
+      currentUnansweredCount?: number;
     };
 
     const placeId = parseGoogleMapsPlaceId(mapsPlaceId);
@@ -46,23 +52,46 @@ export async function POST(request: NextRequest) {
     }
 
     const priorBatches = reset ? 0 : unansweredBatchesLoaded ?? 0;
+
+    if (reset && (unansweredBatchesLoaded ?? 0) > 0 && fetchedAt) {
+      const cooldown = getReviewLoadCooldownState(fetchedAt);
+      if (!cooldown.canRun) {
+        return NextResponse.json({ error: cooldown.message }, { status: 429 });
+      }
+    }
+
     if (!reset && priorBatches >= MAX_UNANSWERED_BATCHES) {
       return NextResponse.json(
-        { error: "Maximum of 5 review batches (100 unanswered) already loaded." },
+        { error: "Maximum of 100 unanswered written reviews already loaded." },
         { status: 400 }
       );
     }
 
     const gl = regionGl(searchRegion);
+    const isFullLoad = Boolean(reset);
+    const targetCount = isFullLoad
+      ? MAX_UNANSWERED_REVIEWS
+      : Math.max(
+          1,
+          MAX_UNANSWERED_REVIEWS - Math.max(0, currentUnansweredCount ?? 0)
+        );
+
     const data = await fetchUnansweredReviewsBatch(placeId, {
       gl,
       nextPageToken: reset ? undefined : nextPageToken,
       existingIds: reset ? [] : existingReviewIds ?? [],
+      targetCount,
     });
 
-    const newBatchCount = priorBatches + 1;
+    const newBatchCount = isFullLoad
+      ? MAX_UNANSWERED_BATCHES
+      : priorBatches + 1;
     const canLoadMore =
-      Boolean(data.nextPageToken) && newBatchCount < MAX_UNANSWERED_BATCHES;
+      Boolean(data.nextPageToken) &&
+      (isFullLoad
+        ? data.unanswered.length < MAX_UNANSWERED_REVIEWS
+        : (currentUnansweredCount ?? 0) + data.unanswered.length <
+          MAX_UNANSWERED_REVIEWS);
 
     return NextResponse.json({
       reviews: {

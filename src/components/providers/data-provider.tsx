@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -22,8 +23,10 @@ import {
   updateRankings,
 } from "@/lib/firestore/collections";
 import { fetchUnansweredReviews, fetchSeoAnalysis, type FetchReviewsProgress } from "@/lib/seo/client";
-import { MAX_UNANSWERED_REVIEWS } from "@/lib/seo/real-data";
+import { getReviewLoadCooldownState } from "@/lib/seo/analysis-cooldown";
+import { MAX_UNANSWERED_REVIEWS, reviewHasWrittenText } from "@/lib/seo/real-data";
 import { resolveSearchLocation } from "@/lib/seo/analysis-location";
+import { getAnalysisCooldownState } from "@/lib/seo/analysis-cooldown";
 import {
   DEFAULT_SEARCH_REGION,
   resolveSearchRegionId,
@@ -49,8 +52,13 @@ interface DataContextValue {
   rankings: RankingsDoc | null;
   profileOptimization: ProfileOptimizationDoc | null;
   searchRegion: string;
+  canRerunAnalysis: boolean;
+  analysisCooldownMessage: string | null;
   refresh: () => Promise<void>;
-  runAnalysis: (override?: Partial<BusinessDoc> & { searchRegion?: string }) => Promise<void>;
+  runAnalysis: (
+    override?: Partial<BusinessDoc> & { searchRegion?: string },
+    options?: { skipCooldown?: boolean }
+  ) => Promise<void>;
   refreshReviews: (onProgress?: (progress: FetchReviewsProgress) => void) => Promise<void>;
   loadMoreUnansweredReviews: (onProgress?: (progress: FetchReviewsProgress) => void) => Promise<void>;
   saveBusiness: (data: Partial<BusinessDoc>) => Promise<void>;
@@ -158,6 +166,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [searchRegion, setSearchRegionState] = useState(DEFAULT_SEARCH_REGION);
   const analysisQueued = useRef(false);
 
+  const analysisCooldown = useMemo(
+    () => getAnalysisCooldownState(dashboard?.lastAnalyzedAt),
+    [dashboard?.lastAnalyzedAt]
+  );
+
   const refresh = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -193,8 +206,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   const runAnalysis = useCallback(
-    async (override?: Partial<BusinessDoc> & { searchRegion?: string }) => {
+    async (
+      override?: Partial<BusinessDoc> & { searchRegion?: string },
+      options?: { skipCooldown?: boolean }
+    ) => {
       if (!user || analyzing) return;
+      if (!options?.skipCooldown && !analysisCooldown.canRun) return;
       const { searchRegion: regionOverride, ...businessOverride } = override ?? {};
       const source = business ? { ...business, ...businessOverride } : null;
       if (!source?.name) return;
@@ -301,7 +318,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setAnalyzing(false);
       }
     },
-    [user, business, dashboard, searchRegion, analyzing]
+    [user, business, dashboard, searchRegion, analyzing, analysisCooldown.canRun]
   );
 
   const refreshReviews = useCallback(
@@ -310,6 +327,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const mapsPlaceId = business?.mapsPlaceId?.trim();
       if (!mapsPlaceId) {
         throw new Error("Add a Google Maps link in Business Settings first.");
+      }
+
+      const cooldown = getReviewLoadCooldownState(reviews?.fetchedAt);
+      if ((reviews?.unansweredBatchesLoaded ?? 0) > 0 && reviews?.fetchedAt && !cooldown.canRun) {
+        throw new Error(cooldown.message ?? "After 1 week you can load next 100 unanswered reviews.");
       }
 
       const activeRegion = resolveSearchRegionId(
@@ -321,6 +343,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         mapsPlaceId,
         searchRegion: activeRegion,
         reset: true,
+        fetchedAt: reviews?.fetchedAt,
         onProgress,
       });
 
@@ -334,7 +357,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setDashboard
       );
     },
-    [user, business, dashboard, searchRegion]
+    [user, business, dashboard, searchRegion, reviews]
   );
 
   const loadMoreUnansweredReviews = useCallback(
@@ -351,6 +374,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       );
 
       const existingInbox = reviews?.inbox ?? [];
+      const currentUnansweredCount = existingInbox.filter(
+        (r) => !r.replied && reviewHasWrittenText(r.text)
+      ).length;
       const result = await fetchUnansweredReviews({
         mapsPlaceId,
         searchRegion: activeRegion,
@@ -358,6 +384,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         nextPageToken: reviews?.nextPageToken,
         existingReviewIds: existingInbox.map((r) => r.id),
         unansweredBatchesLoaded: reviews?.unansweredBatchesLoaded ?? 0,
+        currentUnansweredCount,
         onProgress,
       });
 
@@ -403,7 +430,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     if (needsAnalysis && !analysisQueued.current) {
       analysisQueued.current = true;
-      runAnalysis().finally(() => {
+      runAnalysis(undefined, { skipCooldown: true }).finally(() => {
         analysisQueued.current = false;
       });
     }
@@ -454,6 +481,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         rankings,
         profileOptimization,
         searchRegion,
+        canRerunAnalysis: analysisCooldown.canRun,
+        analysisCooldownMessage: analysisCooldown.message,
         refresh,
         runAnalysis,
         refreshReviews,

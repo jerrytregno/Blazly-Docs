@@ -15,6 +15,14 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "lh3.googleusercontent.com",
       },
+      {
+        protocol: "https",
+        hostname: "kommodo.ai",
+      },
+      {
+        protocol: "https",
+        hostname: "plain-apac-prod-public.komododecks.com",
+      },
     ],
   },
 };

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { SecurityPanel } from "@/components/profile/security-panel";
 import { useAuth } from "@/components/providers/auth-provider";
+import { usePlan } from "@/components/providers/plan-provider";
 import { useData } from "@/components/providers/data-provider";
 import { PageDataGuard } from "@/components/data/page-data-guard";
 import { ProfileSkeleton } from "@/components/profile/profile-skeleton";
@@ -14,6 +15,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { showToast } from "@/components/ui/toast";
 import { getUserProfile, updateAccountProfile } from "@/lib/user-profile";
 import { COUNTRIES, TIME_ZONES, formatTimeZoneLabel } from "@/lib/profile-constants";
+import { formatPlanLabel } from "@/config/plans";
 import { formatDate } from "@/lib/utils";
 import type { AccountProfileInput, UserProfile } from "@/types/user";
 
@@ -39,6 +41,7 @@ function validateForm(form: AccountProfileInput): string | null {
 
 export default function ProfilePage() {
   const { user } = useAuth();
+  const { plan } = usePlan();
   const { business, dashboard, rankings, reviews } = useData();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -148,6 +151,16 @@ export default function ProfilePage() {
                     Edit Profile
                   </Button>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="accountPlan">Plan</Label>
+                <Input
+                  id="accountPlan"
+                  readOnly
+                  value={formatPlanLabel(plan)}
+                  className="cursor-default border-gray-200 bg-gray-50 text-gray-600"
+                />
               </div>
 
               {!editing ? (

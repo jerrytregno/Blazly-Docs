@@ -5,6 +5,7 @@ import {
   ClipboardCheck,
   ImageIcon,
   BarChart3,
+  CreditCard,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
@@ -33,6 +34,9 @@ export interface NavSection {
 
   items?: NavItem[];
 
+  /** Included on the free plan */
+  free?: boolean;
+
 }
 
 
@@ -49,6 +53,8 @@ export const navigation: NavSection[] = [
 
     href: "/dashboard",
 
+    free: true,
+
   },
 
   {
@@ -56,6 +62,7 @@ export const navigation: NavSection[] = [
     label: "Profile Optimization",
     icon: ClipboardCheck,
     href: "/dashboard/profile-optimization",
+    free: true,
   },
   {
     id: "rank-tracker",
@@ -71,6 +78,8 @@ export const navigation: NavSection[] = [
     icon: Radar,
 
     href: "/dashboard/competitor-analysis",
+
+    free: true,
 
   },
 
@@ -107,6 +116,20 @@ export const navigation: NavSection[] = [
     icon: BarChart3,
 
     href: "/dashboard/analytics",
+
+  },
+
+  {
+
+    id: "pricing",
+
+    label: "Pricing",
+
+    icon: CreditCard,
+
+    href: "/dashboard/pricing",
+
+    free: true,
 
   },
 

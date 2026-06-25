@@ -52,7 +52,7 @@ export function AuthLayout({
   return (
     <div className="auth-split">
       <div className="auth-split-brand">
-        <BrandLogo href="/" theme="dark" size="lg" showTagline />
+        <BrandLogo href="/login" theme="dark" size="lg" showTagline />
 
         <div className="max-w-md space-y-8">
           <div>
@@ -82,7 +82,7 @@ export function AuthLayout({
       <div className="auth-split-form">
         <div className="auth-card">
           <div className="mb-8 lg:hidden">
-            <BrandLogo href="/" size="md" showTagline className="justify-center" />
+            <BrandLogo href="/login" size="md" showTagline className="justify-center" />
           </div>
           <div className="mb-8">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h1>

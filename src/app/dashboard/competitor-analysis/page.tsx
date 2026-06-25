@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
+import { useAuth } from "@/components/providers/auth-provider";
 import { useData } from "@/components/providers/data-provider";
 import { PageDataGuard } from "@/components/data/page-data-guard";
 import { FeaturePanel } from "@/components/features/feature-panel";
 import {
   COMPETITION_LEVEL_STYLES,
-  competitionFromCompetitors,
+  isCompetitionDataCurrent,
+  resolveCompetitionAnalysis,
 } from "@/lib/seo/competition-analysis";
 import { resolveSearchLocation } from "@/lib/seo/analysis-location";
+import { fetchCompetitionScan } from "@/lib/seo/client";
 import { fetchMapsCategoryRank } from "@/lib/seo/maps-rank";
 import { parseGoogleMapsPlaceId } from "@/lib/seo/maps-place";
 import { regionGl, resolveSearchRegionId } from "@/lib/seo/search-regions";
@@ -17,7 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { CompetitionAnalysis } from "@/types/firestore";
+import type { CompetitionAnalysis, Competitor } from "@/types/firestore";
 
 function FactorBadge({ impact }: { impact: CompetitionAnalysis["level"] }) {
   const styles = COMPETITION_LEVEL_STYLES[impact];
@@ -36,8 +39,11 @@ function FactorBadge({ impact }: { impact: CompetitionAnalysis["level"] }) {
 }
 
 export default function CompetitorAnalysisPage() {
-  const { business, rankings, dashboard, searchRegion, analyzing, runAnalysis } = useData();
-  const [refreshing, setRefreshing] = useState(false);
+  const { user } = useAuth();
+  const { business, rankings, dashboard, searchRegion, loading, saveRankings } = useData();
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const scanStartedRef = useRef(false);
   const [mapsRankOverride, setMapsRankOverride] = useState<{
     rank: number;
     query: string;
@@ -45,17 +51,23 @@ export default function CompetitorAnalysisPage() {
 
   const category = business?.primaryCategory || "Local business";
   const location = resolveSearchLocation(business ?? {}) || business?.city || "Your market";
+  const businessName = business?.name ?? "Your business";
+  const resolvedRegion = resolveSearchRegionId(
+    dashboard?.searchRegion ?? searchRegion,
+    business?.country
+  );
 
-  const baseAnalysis =
-    rankings?.competitionAnalysis ??
-    (rankings?.competitors?.length
-      ? competitionFromCompetitors(
-          rankings.competitors,
-          category,
-          location,
-          business?.name ?? "Your business"
-        )
-      : null);
+  const isDataCurrent = isCompetitionDataCurrent(rankings, businessName, category, location);
+
+  const baseAnalysis = useMemo(
+    () => resolveCompetitionAnalysis(rankings, business, category, location),
+    [rankings, business, category, location]
+  );
+
+  const competitors = useMemo((): Competitor[] => {
+    if (!isDataCurrent) return [];
+    return rankings?.competitors ?? [];
+  }, [isDataCurrent, rankings?.competitors]);
 
   const analysis = useMemo(() => {
     if (!baseAnalysis) return null;
@@ -69,18 +81,49 @@ export default function CompetitorAnalysisPage() {
     return baseAnalysis;
   }, [baseAnalysis, mapsRankOverride]);
 
-  useEffect(() => {
-    setMapsRankOverride(null);
-  }, [rankings?.competitionAnalysis?.searchedAt]);
+  const runCompetitionScan = useCallback(async () => {
+    if (!business?.name) return;
+    setScanning(true);
+    setScanError(null);
+    try {
+      const result = await fetchCompetitionScan({
+        businessName: business.name,
+        website: business.website,
+        category,
+        location,
+        phone: business.phone,
+        mapsPlaceId: business.mapsPlaceId,
+        searchRegion: resolvedRegion,
+      });
+      await saveRankings({
+        competitors: result.competitors,
+        competitionAnalysis: result.competitionAnalysis,
+      });
+    } catch (error) {
+      setScanError(error instanceof Error ? error.message : "Competition scan failed");
+    } finally {
+      setScanning(false);
+    }
+  }, [business, category, location, resolvedRegion, saveRankings]);
 
   useEffect(() => {
-    if (baseAnalysis?.mapsRankQuery || !business?.mapsPlaceId) return;
+    setMapsRankOverride(null);
+    scanStartedRef.current = false;
+  }, [business?.name, category, location]);
+
+  useEffect(() => {
+    if (loading || !business?.name || !user) return;
+    if (isDataCurrent || scanning || scanStartedRef.current) return;
+    scanStartedRef.current = true;
+    void runCompetitionScan();
+  }, [loading, business?.name, user, isDataCurrent, scanning, runCompetitionScan]);
+
+  useEffect(() => {
+    if (!baseAnalysis?.mapsRankQuery || !business?.mapsPlaceId) return;
     const placeId = parseGoogleMapsPlaceId(business.mapsPlaceId);
     if (!placeId) return;
 
-    const gl = regionGl(
-      resolveSearchRegionId(dashboard?.searchRegion ?? searchRegion, business.country)
-    );
+    const gl = regionGl(resolvedRegion);
 
     let cancelled = false;
     void fetchMapsCategoryRank({
@@ -102,23 +145,13 @@ export default function CompetitorAnalysisPage() {
     baseAnalysis?.mapsRankQuery,
     business?.mapsPlaceId,
     business?.name,
-    business?.country,
     category,
     location,
-    dashboard?.searchRegion,
-    searchRegion,
+    resolvedRegion,
   ]);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    try {
-      await runAnalysis();
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   const styles = analysis ? COMPETITION_LEVEL_STYLES[analysis.level] : null;
+  const showLoading = scanning || (loading && !analysis);
 
   return (
     <PageDataGuard>
@@ -133,10 +166,10 @@ export default function CompetitorAnalysisPage() {
           </div>
           <Button
             variant="outline"
-            onClick={handleRefresh}
-            disabled={refreshing || analyzing}
+            onClick={() => void runCompetitionScan()}
+            disabled={scanning || !business?.name}
           >
-            {refreshing || analyzing ? (
+            {scanning ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <RefreshCw className="h-4 w-4" />
@@ -145,12 +178,34 @@ export default function CompetitorAnalysisPage() {
           </Button>
         </div>
 
-        {!analysis ? (
+        {scanError ? (
+          <Card className="border-red-200 bg-red-50/50">
+            <CardContent className="py-4 text-sm text-red-700">{scanError}</CardContent>
+          </Card>
+        ) : null}
+
+        {showLoading && !analysis ? (
+          <Card className="border-gray-200 bg-white">
+            <CardContent className="flex items-center gap-4 py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+              <div>
+                <p className="font-semibold text-gray-900">Scanning local competition…</p>
+                <p className="text-sm text-gray-500">
+                  Searching Google Maps for {category} near {location}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : !analysis ? (
           <Card className="border-gray-200 bg-white">
             <CardContent className="py-16 text-center">
               <p className="text-gray-600">No competition data yet.</p>
-              <Button className="mt-4" onClick={handleRefresh} disabled={refreshing}>
-                Run analysis
+              <Button
+                className="mt-4"
+                onClick={() => void runCompetitionScan()}
+                disabled={scanning || !business?.name}
+              >
+                Run scan
               </Button>
             </CardContent>
           </Card>
@@ -162,7 +217,7 @@ export default function CompetitorAnalysisPage() {
                 Click <span className="font-medium">Refresh scan</span> to search Google Maps for
                 nearby businesses in your category ({category}).
               </p>
-              <Button className="mt-4" onClick={handleRefresh} disabled={refreshing || analyzing}>
+              <Button className="mt-4" onClick={() => void runCompetitionScan()} disabled={scanning}>
                 Refresh scan
               </Button>
             </CardContent>
@@ -213,7 +268,7 @@ export default function CompetitorAnalysisPage() {
                       : "—",
                   sub: analysis.mapsRankQuery
                     ? `for "${analysis.mapsRankQuery}"`
-                    : "Run analysis to refresh",
+                    : "Refresh scan to update",
                 },
               ].map((s) => (
                 <Card key={s.label} className="border-gray-200 bg-white">
@@ -278,9 +333,9 @@ export default function CompetitorAnalysisPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(rankings?.competitors ?? []).map((c) => (
+                    {competitors.map((c) => (
                       <tr
-                        key={c.name}
+                        key={`${c.name}-${c.rank}`}
                         className={cn(
                           "border-b border-gray-100 last:border-0",
                           c.isYou && "bg-indigo-50"

@@ -6,6 +6,8 @@ import { Building2, ChevronDown, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navigation } from "@/config/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
+import { usePlan } from "@/components/providers/plan-provider";
+import { useUpgradeModal } from "@/components/billing/upgrade-modal-provider";
 import { useState } from "react";
 
 function isSectionActive(
@@ -24,6 +26,8 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
+  const { isPro } = usePlan();
+  const { openUpgradeModal } = useUpgradeModal();
   const [loggingOut, setLoggingOut] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -62,6 +66,28 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           const sectionActive = isSectionActive(pathname, section);
 
           if (isDirectLink) {
+            const needsUpgrade = !section.free && !isPro;
+
+            if (needsUpgrade) {
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => {
+                    openUpgradeModal(section.label);
+                    onNavigate?.();
+                  }}
+                  className={cn(
+                    "blazly-nav-item w-full",
+                    sectionActive && "blazly-nav-item-active"
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{section.label}</span>
+                </button>
+              );
+            }
+
             return (
               <Link
                 key={section.id}

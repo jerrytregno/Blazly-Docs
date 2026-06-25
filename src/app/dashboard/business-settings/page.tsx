@@ -1,30 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Building2,
   Loader2,
   Pencil,
-  RefreshCw,
   Save,
-  Trash2,
 } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { useData } from "@/components/providers/data-provider";
 import { PageDataGuard } from "@/components/data/page-data-guard";
 import { SectionHeader } from "@/components/layout/section-header";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { resetBusinessData } from "@/lib/firestore/reset-business";
-import { markReplacingBusiness } from "@/lib/onboarding-flow";
 import { getUserProfile, updateUserBusinessProfile } from "@/lib/user-profile";
 import { parseGoogleMapsPlaceId, normalizeUserWebsite } from "@/lib/seo/maps-place";
-
-type DialogAction = "replace" | "delete" | null;
 
 interface EditForm {
   name: string;
@@ -38,8 +30,7 @@ interface EditForm {
 
 export default function BusinessSettingsPage() {
   const { user } = useAuth();
-  const { business, dashboard, loading, refresh, saveBusiness, analyzing } = useData();
-  const router = useRouter();
+  const { business, dashboard, saveBusiness, analyzing } = useData();
   const [profile, setProfile] = useState<{
     website: string;
     category: string;
@@ -55,8 +46,6 @@ export default function BusinessSettingsPage() {
     phone: "",
     address: "",
   });
-  const [dialog, setDialog] = useState<DialogAction>(null);
-  const [processing, setProcessing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -87,21 +76,6 @@ export default function BusinessSettingsPage() {
       address: business?.address || "",
     });
   }, [business, profile]);
-
-  const handleReset = async () => {
-    if (!user || !dialog) return;
-    setProcessing(true);
-    setError("");
-    try {
-      await resetBusinessData(user.uid);
-      markReplacingBusiness();
-      setDialog(null);
-      router.replace("/onboarding");
-    } catch {
-      setError("Failed to reset business data. Please try again.");
-      setProcessing(false);
-    }
-  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,7 +154,7 @@ export default function BusinessSettingsPage() {
         )}
 
         <Card className="border-gray-200 bg-white">
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <CardHeader>
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
                 <Building2 className="h-5 w-5" />
@@ -194,13 +168,6 @@ export default function BusinessSettingsPage() {
                 </p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => refresh()} disabled={loading}>
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-            </Button>
           </CardHeader>
           <CardContent>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -312,69 +279,20 @@ export default function BusinessSettingsPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card className="flex flex-col border-amber-200 bg-white">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <RefreshCw className="h-4 w-4 text-amber-600" />
-                Replace Business
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col">
-              <p className="flex-1 text-sm text-gray-600">
-                Start fresh with a different business. Clears all SEO data and opens the setup form.
-              </p>
-              <Button
-                variant="outline"
-                className="mt-4 w-full border-amber-600 text-amber-800 hover:bg-amber-50"
-                onClick={() => setDialog("replace")}
+        <Card className="border-gray-200 bg-white">
+          <CardContent className="p-6">
+            <p className="text-sm text-gray-600">
+              Kindly contact{" "}
+              <a
+                href="mailto:jerry@blazly.ai"
+                className="font-medium text-indigo-600 hover:text-indigo-700"
               >
-                Use Different Business
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="flex flex-col border-red-200 bg-white">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Trash2 className="h-4 w-4 text-red-600" />
-                Delete Business
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col">
-              <p className="flex-1 text-sm text-gray-600">
-                Remove your business profile and all local SEO metrics from Blazly.
-              </p>
-              <Button
-                variant="outline"
-                className="mt-4 w-full border-red-600 text-red-700 hover:bg-red-50"
-                onClick={() => setDialog("delete")}
-              >
-                Delete Business Information
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        <ConfirmDialog
-          open={dialog === "replace"}
-          title="Replace business?"
-          description="This will delete your current business profile, rankings, reviews, and dashboard metrics. You will be taken to the business setup form to add a new business. Your account will not be deleted."
-          confirmLabel="Replace business"
-          loading={processing}
-          onConfirm={handleReset}
-          onCancel={() => !processing && setDialog(null)}
-        />
-
-        <ConfirmDialog
-          open={dialog === "delete"}
-          title="Delete business information?"
-          description="All business data will be permanently removed from Firestore including GBP details, rankings, citations, and reviews. You can set up a new business afterward without creating a new account."
-          confirmLabel="Delete and continue"
-          loading={processing}
-          onConfirm={handleReset}
-          onCancel={() => !processing && setDialog(null)}
-        />
+                jerry@blazly.ai
+              </a>{" "}
+              to replace or delete business details.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </PageDataGuard>
   );

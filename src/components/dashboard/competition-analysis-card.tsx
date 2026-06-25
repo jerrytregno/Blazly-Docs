@@ -5,7 +5,7 @@ import { ArrowRight, MapPin, Tag, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   COMPETITION_LEVEL_STYLES,
-  competitionFromCompetitors,
+  resolveCompetitionAnalysis,
 } from "@/lib/seo/competition-analysis";
 import { resolveSearchLocation } from "@/lib/seo/analysis-location";
 import type { BusinessDoc, CompetitionAnalysis, RankingsDoc } from "@/types/firestore";
@@ -36,20 +36,10 @@ export function CompetitionAnalysisCard({
   rankings: RankingsDoc | null;
   analyzing?: boolean;
 }) {
-  const stored = rankings?.competitionAnalysis;
   const category = business?.primaryCategory || "Local business";
   const location = resolveSearchLocation(business ?? {}) || business?.city || "Your market";
 
-  const analysis =
-    stored ??
-    (rankings?.competitors?.length
-      ? competitionFromCompetitors(
-          rankings.competitors,
-          category,
-          location,
-          business?.name ?? "Your business"
-        )
-      : null);
+  const analysis = resolveCompetitionAnalysis(rankings, business, category, location);
 
   if (!analysis && !analyzing) {
     return (
