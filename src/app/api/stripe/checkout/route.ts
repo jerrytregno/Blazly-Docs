@@ -7,7 +7,7 @@ import {
   isMissingStripeCustomerError,
   stripeErrorMessage,
 } from "@/lib/stripe";
-import { verifyIdToken, getAdminDb } from "@/lib/firebase-admin";
+import { verifyIdToken, getAdminDb, isFirebaseAdminConfigured } from "@/lib/firebase-admin";
 import { logStripeCheckoutError } from "@/lib/stripe/logs";
 
 export const runtime = "nodejs";
@@ -42,6 +42,16 @@ export async function POST(request: NextRequest) {
     if (!stripe || !STRIPE_PRICE_ID) {
       return NextResponse.json(
         { error: "Payments are not configured on the server." },
+        { status: 503 }
+      );
+    }
+
+    if (!isFirebaseAdminConfigured()) {
+      return NextResponse.json(
+        {
+          error:
+            "Server auth is not configured. Check FIREBASE_SERVICE_ACCOUNT_KEY on Vercel (valid JSON, single line).",
+        },
         { status: 503 }
       );
     }

@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
+  // firebase-admin uses native/grpc modules that break when webpack bundles them on Vercel.
+  serverExternalPackages: ["firebase-admin", "stripe"],
   async redirects() {
     return [
       { source: "/dashboard/projects", destination: "/dashboard/gbp/business-details", permanent: false },

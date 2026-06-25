@@ -2,19 +2,54 @@ import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue, type Firestore } from "firebase-admin/firestore";
 
+function parseServiceAccountJson(raw: string): Record<string, string> | null {
+  const trimmed = raw.trim();
+  const candidates = [
+    trimmed,
+    trimmed.startsWith("'") && trimmed.endsWith("'") ? trimmed.slice(1, -1) : null,
+    trimmed.startsWith('"') && trimmed.endsWith('"') ? trimmed.slice(1, -1) : null,
+  ].filter((value): value is string => Boolean(value));
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as Record<string, unknown>;
+      if (typeof parsed.private_key === "string") {
+        parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
+      }
+      return parsed as Record<string, string>;
+    } catch {
+      // try next candidate
+    }
+  }
+
+  return null;
+}
+
 function getAdminApp(): App | null {
   if (getApps().length) return getApps()[0]!;
 
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (!raw?.trim()) return null;
 
-  try {
-    return initializeApp({
-      credential: cert(JSON.parse(raw) as Record<string, string>),
-    });
-  } catch {
+  const serviceAccount = parseServiceAccountJson(raw);
+  if (!serviceAccount) {
+    console.error("FIREBASE_SERVICE_ACCOUNT_KEY is set but could not be parsed as JSON.");
     return null;
   }
+
+  try {
+    return initializeApp({
+      credential: cert(serviceAccount),
+    });
+  } catch (error) {
+    console.error("Failed to initialize Firebase Admin:", error);
+    return null;
+  }
+}
+
+/** True when Firebase Admin SDK initialized successfully (server-side auth/Firestore). */
+export function isFirebaseAdminConfigured(): boolean {
+  return getAdminApp() !== null;
 }
 
 /** Firestore instance from the Admin SDK, or null when credentials are missing. */
@@ -34,7 +69,8 @@ export async function verifyIdToken(
   try {
     const decoded = await getAuth(app).verifyIdToken(idToken);
     return { uid: decoded.uid, email: decoded.email ?? null };
-  } catch {
+  } catch (error) {
+    console.error("Firebase ID token verification failed:", error);
     return null;
   }
 }

@@ -1,6 +1,5 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { getAdminDb } from "@/lib/firebase-admin";
-import { getBusiness, updateBusiness } from "@/lib/firestore/collections";
 import {
   currentEnhancementPeriod,
   IMAGE_ENHANCEMENTS_MONTHLY_LIMIT,
@@ -21,102 +20,73 @@ function quotaFromRecord(
   });
 }
 
-export async function getImageEnhancementQuota(userId: string): Promise<ImageEnhancementQuota> {
+function requireAdminDb() {
   const db = getAdminDb();
-  if (db) {
-    const snap = await db.collection("businesses").doc(userId).get();
-    return quotaFromRecord(snap.data());
+  if (!db) {
+    throw new Error("Firebase Admin is not configured on the server.");
   }
+  return db;
+}
 
-  const business = await getBusiness(userId);
-  return quotaFromRecord(business);
+export async function getImageEnhancementQuota(userId: string): Promise<ImageEnhancementQuota> {
+  const db = requireAdminDb();
+  const snap = await db.collection("businesses").doc(userId).get();
+  return quotaFromRecord(snap.data());
 }
 
 export async function consumeImageEnhancementSlot(userId: string): Promise<ConsumeResult> {
   const period = currentEnhancementPeriod();
-  const db = getAdminDb();
+  const db = requireAdminDb();
 
-  if (db) {
-    return db.runTransaction(async (tx) => {
-      const ref = db.collection("businesses").doc(userId);
-      const snap = await tx.get(ref);
-      const quota = quotaFromRecord(snap.data());
+  return db.runTransaction(async (tx) => {
+    const ref = db.collection("businesses").doc(userId);
+    const snap = await tx.get(ref);
+    const quota = quotaFromRecord(snap.data());
 
-      if (!quota.canEnhance) {
-        return { ok: false, quota };
-      }
+    if (!quota.canEnhance) {
+      return { ok: false, quota };
+    }
 
-      const used = quota.used + 1;
-      tx.set(
-        ref,
-        {
-          imageEnhancementsUsed: used,
-          imageEnhancementsPeriod: period,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
+    const used = quota.used + 1;
+    tx.set(
+      ref,
+      {
+        imageEnhancementsUsed: used,
+        imageEnhancementsPeriod: period,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
 
-      return {
-        ok: true,
-        quota: resolveImageEnhancementQuota({ used, period }),
-      };
-    });
-  }
-
-  const business = await getBusiness(userId);
-  const quota = quotaFromRecord(business);
-  if (!quota.canEnhance) {
-    return { ok: false, quota };
-  }
-
-  const used = quota.used + 1;
-  await updateBusiness(userId, {
-    imageEnhancementsUsed: used,
-    imageEnhancementsPeriod: period,
+    return {
+      ok: true,
+      quota: resolveImageEnhancementQuota({ used, period }),
+    };
   });
-
-  return {
-    ok: true,
-    quota: resolveImageEnhancementQuota({ used, period }),
-  };
 }
 
 export async function releaseImageEnhancementSlot(userId: string): Promise<void> {
   const period = currentEnhancementPeriod();
-  const db = getAdminDb();
+  const db = requireAdminDb();
 
-  if (db) {
-    await db.runTransaction(async (tx) => {
-      const ref = db.collection("businesses").doc(userId);
-      const snap = await tx.get(ref);
-      const data = snap.data();
-      if (data?.imageEnhancementsPeriod !== period) return;
+  await db.runTransaction(async (tx) => {
+    const ref = db.collection("businesses").doc(userId);
+    const snap = await tx.get(ref);
+    const data = snap.data();
+    if (data?.imageEnhancementsPeriod !== period) return;
 
-      const used = Math.max(0, (data.imageEnhancementsUsed as number | undefined) ?? 0);
-      if (used <= 0) return;
+    const used = Math.max(0, (data.imageEnhancementsUsed as number | undefined) ?? 0);
+    if (used <= 0) return;
 
-      tx.set(
-        ref,
-        {
-          imageEnhancementsUsed: used - 1,
-          imageEnhancementsPeriod: period,
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-    });
-    return;
-  }
-
-  const business = await getBusiness(userId);
-  if (business.imageEnhancementsPeriod !== period) return;
-  const used = Math.max(0, business.imageEnhancementsUsed ?? 0);
-  if (used <= 0) return;
-
-  await updateBusiness(userId, {
-    imageEnhancementsUsed: used - 1,
-    imageEnhancementsPeriod: period,
+    tx.set(
+      ref,
+      {
+        imageEnhancementsUsed: used - 1,
+        imageEnhancementsPeriod: period,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
   });
 }
 
