@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
     "firebase-admin",
     "@google-cloud/firestore",
     "google-gax",
+    "jwks-rsa",
+    "jose",
     "stripe",
   ],
   outputFileTracingIncludes: {
