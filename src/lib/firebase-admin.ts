@@ -2,6 +2,7 @@ type App = import("firebase-admin/app").App;
 type Firestore = import("firebase-admin/firestore").Firestore;
 
 let cachedApp: App | null | undefined;
+let cachedServiceAccount: Record<string, string> | null | undefined;
 
 function parseServiceAccountJson(raw: string): Record<string, string> | null {
   const trimmed = raw.trim();
@@ -33,6 +34,7 @@ function getAdminApp(): App | null {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
   if (!raw?.trim()) {
     cachedApp = null;
+    cachedServiceAccount = null;
     return null;
   }
 
@@ -40,8 +42,11 @@ function getAdminApp(): App | null {
   if (!serviceAccount) {
     console.error("FIREBASE_SERVICE_ACCOUNT_KEY is set but could not be parsed as JSON.");
     cachedApp = null;
+    cachedServiceAccount = null;
     return null;
   }
+
+  cachedServiceAccount = serviceAccount;
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -73,6 +78,14 @@ function getAuthModule() {
   return require("firebase-admin/auth") as typeof import("firebase-admin/auth");
 }
 
+/** Firebase project id from the service account (server-side). */
+export function getAdminProjectId(): string | null {
+  if (cachedServiceAccount === undefined) {
+    getAdminApp();
+  }
+  return cachedServiceAccount?.project_id ?? null;
+}
+
 /** True when Firebase Admin SDK initialized successfully (server-side auth/Firestore). */
 export function isFirebaseAdminConfigured(): boolean {
   return getAdminApp() !== null;
@@ -98,9 +111,23 @@ export async function verifyIdToken(
     const decoded = await getAuth(app).verifyIdToken(idToken);
     return { uid: decoded.uid, email: decoded.email ?? null };
   } catch (error) {
-    console.error("Firebase ID token verification failed:", error);
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? String((error as { code?: string }).code)
+        : "unknown";
+    console.error("Firebase ID token verification failed:", code, error);
     return null;
   }
+}
+
+/** Returns a user-facing hint when token verification fails on the server. */
+export function authVerificationHint(): string {
+  const clientProject = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim();
+  const adminProject = getAdminProjectId();
+  if (clientProject && adminProject && clientProject !== adminProject) {
+    return `Firebase project mismatch: client uses "${clientProject}" but server uses "${adminProject}". Align NEXT_PUBLIC_FIREBASE_* and FIREBASE_SERVICE_ACCOUNT_KEY on Vercel, then redeploy.`;
+  }
+  return "Sign out, sign back in, and try again. If it persists, redeploy after verifying Firebase env vars on Vercel.";
 }
 
 export async function revokeUserRefreshTokens(idToken: string): Promise<boolean> {

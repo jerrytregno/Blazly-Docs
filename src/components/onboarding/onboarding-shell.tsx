@@ -13,27 +13,31 @@ export function OnboardingShell({ title, subtitle, children }: OnboardingShellPr
   return (
     <div className="auth-split">
       <div className="auth-split-brand">
-        <BrandLogo href="/signup" theme="dark" size="lg" showTagline />
-        <div className="max-w-md space-y-6">
-          <h2 className="text-3xl font-bold leading-tight text-white">
-            Let&apos;s set up your business
-          </h2>
-          <p className="text-indigo-200">
-            We&apos;ll connect your Google Maps listing and run your first local SEO
-            analysis in minutes.
-          </p>
-          <ul className="space-y-3 text-sm text-slate-300">
-            {["Add your Maps link", "We fetch live GBP data", "Get your SEO score"].map(
-              (step) => (
-                <li key={step} className="flex items-center gap-3">
-                  <CheckCircle2 className="h-4 w-4 text-indigo-400" />
-                  {step}
-                </li>
-              )
-            )}
-          </ul>
+        <div className="flex w-full max-w-md flex-col items-start">
+          <BrandLogo href="/signup" theme="dark" size="lg" showTagline className="mb-8" />
+          <div className="w-full space-y-8 text-left">
+            <div>
+              <h2 className="text-3xl font-bold leading-tight tracking-tight text-white">
+                Let&apos;s set up your business
+              </h2>
+              <p className="mt-4 text-base leading-relaxed text-indigo-200">
+                We&apos;ll connect your Google Maps listing and run your first local SEO
+                analysis in minutes.
+              </p>
+            </div>
+            <ul className="inline-flex flex-col items-start space-y-3 text-left">
+              {["Add your Maps link", "We fetch live GBP data", "Get your SEO score"].map(
+                (step) => (
+                  <li key={step} className="flex items-center gap-3 text-sm text-slate-300">
+                    <CheckCircle2 className="h-5 w-5 shrink-0 text-indigo-400" />
+                    {step}
+                  </li>
+                )
+              )}
+            </ul>
+            <p className="text-xs text-slate-500">Step 1 of your local SEO journey</p>
+          </div>
         </div>
-        <p className="text-xs text-slate-500">Step 1 of your local SEO journey</p>
       </div>
 
       <div className="auth-split-form">

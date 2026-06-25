@@ -5,7 +5,7 @@ import type { User } from "firebase/auth";
  * browser to Stripe's hosted payment page.
  */
 export async function startCheckout(user: User, quantity = 1): Promise<void> {
-  const idToken = await user.getIdToken();
+  const idToken = await user.getIdToken(true);
   const qty = Math.min(10, Math.max(1, Math.floor(quantity)));
 
   const res = await fetch("/api/stripe/checkout", {

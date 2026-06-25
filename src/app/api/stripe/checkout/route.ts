@@ -7,7 +7,7 @@ import {
   isMissingStripeCustomerError,
   stripeErrorMessage,
 } from "@/lib/stripe";
-import { verifyIdToken, getAdminDb, isFirebaseAdminConfigured } from "@/lib/firebase-admin";
+import { verifyIdToken, getAdminDb, isFirebaseAdminConfigured, authVerificationHint } from "@/lib/firebase-admin";
 import { logStripeCheckoutError } from "@/lib/stripe/logs";
 
 export const runtime = "nodejs";
@@ -59,7 +59,10 @@ export async function POST(request: NextRequest) {
 
     const decoded = await verifyIdToken(idToken.trim());
     if (!decoded) {
-      return NextResponse.json({ error: "Invalid or expired session." }, { status: 401 });
+      return NextResponse.json(
+        { error: `Invalid or expired session. ${authVerificationHint()}` },
+        { status: 401 }
+      );
     }
 
     uid = decoded.uid;
