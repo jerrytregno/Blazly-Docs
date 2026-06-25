@@ -73,3 +73,32 @@ export async function saveStripeLog(
 
   await db.collection(COLLECTION).doc(event.id).set(record, { merge: true });
 }
+
+/** Persist a checkout API failure (before Stripe redirects the user). */
+export async function logStripeCheckoutError(input: {
+  firebaseUid?: string;
+  quantity?: number;
+  stripeCustomerId?: string | null;
+  error: unknown;
+}): Promise<void> {
+  const db = getAdminDb();
+  if (!db) return;
+
+  const message =
+    input.error instanceof Error ? input.error.message : String(input.error);
+  const stripeCode =
+    input.error instanceof Error && "code" in input.error
+      ? String((input.error as { code?: string }).code ?? "")
+      : null;
+
+  await db.collection(COLLECTION).add({
+    type: "checkout.error",
+    status: "error" satisfies StripeLogStatus,
+    firebaseUid: input.firebaseUid ?? null,
+    stripeCustomerId: input.stripeCustomerId ?? null,
+    quantity: input.quantity ?? null,
+    error: message,
+    stripeCode,
+    receivedAt: FieldValue.serverTimestamp(),
+  });
+}

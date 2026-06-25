@@ -1,10 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStripe, STRIPE_PRICE_ID, getAppUrl } from "@/lib/stripe";
+import type Stripe from "stripe";
+import {
+  getStripe,
+  STRIPE_PRICE_ID,
+  getAppUrl,
+  isMissingStripeCustomerError,
+  stripeErrorMessage,
+} from "@/lib/stripe";
 import { verifyIdToken, getAdminDb } from "@/lib/firebase-admin";
+import { logStripeCheckoutError } from "@/lib/stripe/logs";
 
 export const runtime = "nodejs";
 
+type CheckoutParams = Stripe.Checkout.SessionCreateParams;
+
+async function createCheckoutSession(
+  stripe: Stripe,
+  params: CheckoutParams
+): Promise<Stripe.Checkout.Session> {
+  return stripe.checkout.sessions.create(params);
+}
+
 export async function POST(request: NextRequest) {
+  let uid: string | undefined;
+  let quantity = 1;
+  let customerId: string | undefined;
+
   try {
     const { idToken, quantity: rawQuantity } = (await request.json()) as {
       idToken?: string;
@@ -15,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "idToken is required" }, { status: 400 });
     }
 
-    const quantity = Math.min(10, Math.max(1, Math.floor(rawQuantity ?? 1)));
+    quantity = Math.min(10, Math.max(1, Math.floor(rawQuantity ?? 1)));
 
     const stripe = getStripe();
     if (!stripe || !STRIPE_PRICE_ID) {
@@ -30,33 +51,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid or expired session." }, { status: 401 });
     }
 
-    const { uid, email } = decoded;
+    uid = decoded.uid;
+    const email = decoded.email;
 
-    // Reuse an existing Stripe customer id if we have one stored.
-    let customerId: string | undefined;
     const db = getAdminDb();
     if (db) {
       const snap = await db.collection("users").doc(uid).get();
       customerId = (snap.data()?.stripeCustomerId as string) ?? undefined;
     }
 
-    const appUrl = getAppUrl();
+    const appUrl = getAppUrl(request);
 
-    const session = await stripe.checkout.sessions.create({
+    const baseParams: CheckoutParams = {
       mode: "subscription",
       line_items: [{ price: STRIPE_PRICE_ID, quantity }],
-      ...(customerId
-        ? { customer: customerId }
-        : email
-          ? { customer_email: email }
-          : {}),
       client_reference_id: uid,
       metadata: { firebaseUid: uid, businessQuantity: String(quantity) },
       subscription_data: { metadata: { firebaseUid: uid } },
       allow_promotion_codes: true,
       success_url: `${appUrl}/dashboard/pricing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/dashboard/pricing?checkout=cancelled`,
-    });
+    };
+
+    let session: Stripe.Checkout.Session;
+    try {
+      session = await createCheckoutSession(stripe, {
+        ...baseParams,
+        ...(customerId
+          ? { customer: customerId }
+          : email
+            ? { customer_email: email }
+            : {}),
+      });
+    } catch (error) {
+      // Stored customer ids from test mode (or manual grants) break live checkout.
+      if (customerId && isMissingStripeCustomerError(error)) {
+        session = await createCheckoutSession(stripe, {
+          ...baseParams,
+          ...(email ? { customer_email: email } : {}),
+        });
+      } else {
+        throw error;
+      }
+    }
 
     if (!session.url) {
       return NextResponse.json({ error: "Could not start checkout." }, { status: 500 });
@@ -65,8 +102,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ url: session.url });
   } catch (error) {
     console.error("Stripe checkout error:", error);
+    await logStripeCheckoutError({
+      firebaseUid: uid,
+      quantity,
+      stripeCustomerId: customerId ?? null,
+      error,
+    });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to start checkout" },
+      { error: stripeErrorMessage(error) },
       { status: 500 }
     );
   }
