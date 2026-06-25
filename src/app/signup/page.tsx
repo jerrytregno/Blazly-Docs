@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { AuthLayout } from "@/components/auth/auth-layout";
+import { ForgotPasswordLink } from "@/components/auth/forgot-password-link";
 import { getFirebaseAuthErrorMessage } from "@/lib/auth-errors";
 import { auth } from "@/lib/firebase";
 import { markPendingOnboarding } from "@/lib/onboarding-flow";
@@ -83,7 +84,7 @@ export default function SignupPage() {
   return (
     <AuthLayout
       title="Create Account"
-      subtitle="Get started with Blazly SEO."
+      subtitle="Get Started With Blazly Local SEO"
       onGoogleSignIn={handleGoogle}
       googleLoading={loading}
       footer={
@@ -95,7 +96,7 @@ export default function SignupPage() {
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
           <label htmlFor="email" className="text-[11px] font-semibold tracking-widest text-gray-500">
             EMAIL
@@ -108,7 +109,7 @@ export default function SignupPage() {
             placeholder="you@example.com"
             required
             autoComplete="email"
-            className="auth-input h-12 w-full rounded-xl px-4 text-sm"
+            className="auth-input h-14 w-full rounded-xl px-4 text-base"
           />
         </div>
         <div className="space-y-2">
@@ -124,8 +125,9 @@ export default function SignupPage() {
             required
             autoComplete="new-password"
             minLength={6}
-            className="auth-input h-12 w-full rounded-xl px-4 text-sm"
+            className="auth-input h-14 w-full rounded-xl px-4 text-base"
           />
+          <ForgotPasswordLink email={email} />
         </div>
         {error && (
           <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>
@@ -133,7 +135,7 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={loading}
-          className="gradient-btn h-12 w-full rounded-xl text-sm font-semibold transition"
+          className="gradient-btn h-14 w-full rounded-xl text-base font-semibold transition"
         >
           {loading ? "Creating account..." : "Create Account"}
         </button>

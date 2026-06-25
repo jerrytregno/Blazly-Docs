@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
 import { AuthLayout } from "@/components/auth/auth-layout";
+import { ForgotPasswordLink } from "@/components/auth/forgot-password-link";
 import { usePostAuthRedirect } from "@/hooks/use-post-auth-redirect";
 import { getFirebaseAuthErrorMessage } from "@/lib/auth-errors";
 import { auth } from "@/lib/firebase";
@@ -67,7 +68,7 @@ export default function LoginPage() {
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
           <label htmlFor="email" className="text-[11px] font-semibold tracking-widest text-gray-500">
             EMAIL
@@ -80,7 +81,7 @@ export default function LoginPage() {
             placeholder="you@example.com"
             required
             autoComplete="email"
-            className="auth-input h-12 w-full rounded-xl px-4 text-sm"
+            className="auth-input h-14 w-full rounded-xl px-4 text-base"
           />
         </div>
         <div className="space-y-2">
@@ -95,8 +96,9 @@ export default function LoginPage() {
             placeholder="••••••••"
             required
             autoComplete="current-password"
-            className="auth-input h-12 w-full rounded-xl px-4 text-sm"
+            className="auth-input h-14 w-full rounded-xl px-4 text-base"
           />
+          <ForgotPasswordLink email={email} />
         </div>
         {error && (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
@@ -104,7 +106,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="gradient-btn h-12 w-full rounded-xl text-sm font-semibold transition"
+          className="gradient-btn h-14 w-full rounded-xl text-base font-semibold transition"
         >
           {loading ? "Signing in..." : "Sign In"}
         </button>

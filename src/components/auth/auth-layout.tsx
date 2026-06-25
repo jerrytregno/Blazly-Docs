@@ -50,50 +50,52 @@ export function AuthLayout({
   googleLoading,
 }: AuthLayoutProps) {
   return (
-    <div className="auth-split">
-      <div className="auth-split-brand">
-        <BrandLogo href="/login" theme="dark" size="lg" showTagline />
-
-        <div className="max-w-md space-y-8">
-          <div>
-            <h2 className="text-3xl font-bold leading-tight tracking-tight text-white">
-              Grow your local presence with AI
-            </h2>
-            <p className="mt-4 text-base leading-relaxed text-indigo-200">
-              The all-in-one platform to manage GBP, outrank competitors, and turn
-              reviews into revenue.
-            </p>
-          </div>
-          <ul className="space-y-3">
-            {AUTH_FEATURES.map((feature) => (
-              <li key={feature} className="flex items-center gap-3 text-sm text-slate-300">
-                <CheckCircle2 className="h-5 w-5 shrink-0 text-indigo-400" />
-                {feature}
-              </li>
-            ))}
-          </ul>
+    <div className="auth-split relative">
+      <div className="absolute left-5 top-5 z-20 sm:left-8 sm:top-8">
+        <div className="hidden lg:block">
+          <BrandLogo href="/signup" theme="dark" size="md" showTagline />
         </div>
+        <div className="lg:hidden">
+          <BrandLogo href="/signup" theme="light" size="md" showTagline />
+        </div>
+      </div>
 
-        <p className="text-xs text-slate-500">
-          Trusted by local businesses worldwide
-        </p>
+      <div className="auth-split-brand">
+        <div className="flex w-full max-w-md flex-col items-center">
+          <div className="space-y-8">
+            <div>
+              <h2 className="text-3xl font-bold leading-tight tracking-tight text-white">
+                Grow your local presence with AI
+              </h2>
+              <p className="mt-4 text-base leading-relaxed text-indigo-200">
+                The all-in-one platform to manage GBP, outrank competitors, and turn
+                reviews into revenue.
+              </p>
+            </div>
+            <ul className="mx-auto inline-flex flex-col items-start space-y-3 text-left">
+              {AUTH_FEATURES.map((feature) => (
+                <li key={feature} className="flex items-center gap-3 text-sm text-slate-300">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-indigo-400" />
+                  {feature}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       </div>
 
       <div className="auth-split-form">
         <div className="auth-card">
-          <div className="mb-8 lg:hidden">
-            <BrandLogo href="/login" size="md" showTagline className="justify-center" />
-          </div>
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
-            <p className="mt-2 text-sm text-slate-500">{subtitle}</p>
+          <div className="mb-10">
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">{title}</h1>
+            <p className="mt-3 text-base text-slate-500">{subtitle}</p>
           </div>
 
           <button
             type="button"
             onClick={onGoogleSignIn}
             disabled={googleLoading}
-            className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+            className="flex h-14 w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 text-base font-medium text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
           >
             <GoogleIcon />
             {googleLoading ? "Please wait…" : "Continue with Google"}

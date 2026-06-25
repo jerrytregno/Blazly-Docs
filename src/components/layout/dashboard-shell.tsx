@@ -48,7 +48,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <div className="dashboard-app flex h-[100dvh] max-h-[100dvh] overflow-hidden">
         <aside className="blazly-sidebar hidden shrink-0 flex-col lg:flex">
           <div className="shrink-0 border-b border-slate-800 px-5 py-5">
-            <BrandLogo href="/dashboard" theme="dark" showTagline />
+            <BrandLogo href="/dashboard" theme="dark" size="lg" showTagline />
           </div>
           <SidebarNav />
         </aside>
@@ -63,7 +63,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             />
             <aside className="blazly-sidebar absolute left-0 top-0 flex h-full w-[min(100%,280px)] flex-col shadow-2xl">
               <div className="flex items-center justify-between border-b border-slate-800 px-4 py-4">
-                <BrandLogo href="/dashboard" theme="dark" showTagline />
+                <BrandLogo href="/dashboard" theme="dark" size="lg" showTagline />
                 <button
                   type="button"
                   className="rounded-lg p-2 text-slate-300 hover:bg-white/10 hover:text-white"

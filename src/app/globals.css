@@ -421,17 +421,19 @@ select.auth-input option {
 
 @media (min-width: 1024px) {
   .auth-split {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(300px, 2fr) minmax(0, 3fr);
   }
 }
 
 .auth-split-brand {
   display: none;
   flex-direction: column;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: center;
   background: linear-gradient(160deg, #1f1412 0%, #3d2620 45%, #5e2b1f 100%);
-  padding: 3rem;
+  padding: 2.5rem 2rem;
   color: white;
+  text-align: center;
 }
 
 @media (min-width: 1024px) {
@@ -444,18 +446,28 @@ select.auth-input option {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1.5rem;
+  padding: 4.5rem 1.5rem 2rem;
   background: #f8fafc;
 }
 
 .auth-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 540px;
   border-radius: var(--radius);
   border: 1px solid #e2e8f0;
   background: #ffffff;
-  padding: 2rem;
+  padding: 2.75rem 2.5rem;
   box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06);
+}
+
+.auth-card .auth-input {
+  min-height: 3.25rem;
+  font-size: 0.9375rem;
+}
+
+.auth-card .gradient-btn {
+  min-height: 3.25rem;
+  font-size: 1rem;
 }
 
 @media (max-width: 639px) {
@@ -476,7 +488,7 @@ select.auth-input option {
   }
 
   .auth-card {
-    padding: 1.25rem;
+    padding: 1.75rem 1.5rem;
   }
 
   .auth-split-form {

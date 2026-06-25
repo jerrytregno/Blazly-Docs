@@ -19,15 +19,21 @@ export function BrandLogo({
   className?: string;
 }) {
   const markHeight =
-    size === "sm" ? 34 : size === "lg" ? 48 : showTagline ? 42 : 38;
+    size === "sm" ? 34 : size === "lg" ? 52 : showTagline ? 46 : 38;
   const titleClass =
     size === "lg" ? "text-xl font-bold" : size === "sm" ? "text-sm font-semibold" : "text-base font-bold";
-  const taglineClass =
+  const blazlyWithTaglineClass =
     size === "lg"
-      ? "text-lg font-bold"
+      ? "text-2xl font-bold"
       : size === "sm"
-        ? "text-sm font-semibold"
-        : "text-base font-bold";
+        ? "text-sm font-bold"
+        : "text-xl font-bold";
+  const localSeoClass =
+    size === "lg"
+      ? "text-sm font-semibold uppercase tracking-wide"
+      : size === "sm"
+        ? "text-[10px] font-semibold uppercase tracking-wide"
+        : "text-xs font-semibold uppercase tracking-wide";
 
   const content = (
     <div className={cn("flex items-center gap-3", className)}>
@@ -54,15 +60,15 @@ export function BrandLogo({
         ) : (
           <p
             className={cn(
-              taglineClass,
               "leading-snug",
               theme === "dark" ? "text-white" : "text-slate-900"
             )}
           >
-            <span className="block font-bold">Blazly</span>
+            <span className={cn("block", blazlyWithTaglineClass)}>Blazly</span>
             <span
               className={cn(
-                "block text-xs font-semibold uppercase tracking-wide",
+                "block",
+                localSeoClass,
                 theme === "dark" ? "text-white/90" : "text-slate-500"
               )}
             >

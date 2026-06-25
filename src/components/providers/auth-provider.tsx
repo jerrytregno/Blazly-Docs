@@ -20,6 +20,7 @@ import {
   type User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { requestPasswordReset } from "@/lib/password-reset";
 import { ensureUserProfile } from "@/lib/user-profile";
 
 interface AuthContextValue {
@@ -27,6 +28,7 @@ interface AuthContextValue {
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   signInWithGoogle: () => Promise<{ isNewUser: boolean }>;
   logout: () => Promise<void>;
 }
@@ -57,6 +59,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await ensureUserProfile(cred.user.uid);
   };
 
+  const resetPassword = async (email: string) => {
+    await requestPasswordReset(email);
+  };
+
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
@@ -71,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signIn, signUp, signInWithGoogle, logout }}
+      value={{ user, loading, signIn, signUp, resetPassword, signInWithGoogle, logout }}
     >
       {children}
     </AuthContext.Provider>

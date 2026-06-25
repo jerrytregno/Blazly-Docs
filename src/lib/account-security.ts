@@ -4,12 +4,11 @@ import {
   linkWithCredential,
   reauthenticateWithCredential,
   reauthenticateWithPopup,
-  sendPasswordResetEmail,
   updateEmail,
   updatePassword,
   type User,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { requestPasswordReset } from "@/lib/password-reset";
 
 export function hasEmailPasswordProvider(user: User): boolean {
   return user.providerData.some((p) => p.providerId === "password");
@@ -123,7 +122,7 @@ export async function changeAccountEmail(
 }
 
 export async function sendAccountPasswordReset(email: string): Promise<void> {
-  await sendPasswordResetEmail(auth, email.trim());
+  await requestPasswordReset(email);
 }
 
 export async function revokeAllSessions(idToken: string): Promise<boolean> {

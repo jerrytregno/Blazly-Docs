@@ -34,6 +34,8 @@ export function getFirebaseAuthErrorMessage(error: unknown): string {
       return "Too many attempts. Please wait and try again.";
     case "auth/requires-recent-login":
       return "Please sign out and sign in again, then retry this action.";
+    case "auth/invalid-continue-uri":
+      return "Password reset is not configured for this domain. Add your site URL under Firebase Authentication → Settings → Authorized domains.";
     case "auth/configuration-not-found":
       return "Firebase Auth is not configured. Enable Authentication in Firebase Console.";
     default:
