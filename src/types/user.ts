@@ -14,6 +14,11 @@ export interface UserProfile {
   country: string;
   timeZone: string;
   plan: AccountPlan;
+  /** Number of business profiles the user has paid for (1 payment = 1 slot). */
+  businessSlots: number;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  subscriptionStatus?: string;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -104,9 +104,9 @@ export function DashboardInsightsRow({
               <p className="text-base text-gray-500">Run analysis to discover competitors.</p>
             ) : (
               <ul className="space-y-3">
-                {topCompetitors.map((c) => (
+                {topCompetitors.map((c, i) => (
                   <li
-                    key={c.name}
+                    key={`${c.name}-${i}`}
                     className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-base"
                   >
                     <span className="font-medium text-gray-900">{c.name}</span>

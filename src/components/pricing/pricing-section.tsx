@@ -1,7 +1,14 @@
-import { Building2, CalendarDays, Check, Plus } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { Building2, CalendarDays, Check, Loader2, Plus } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/providers/auth-provider";
+import { usePlan } from "@/components/providers/plan-provider";
+import { startCheckout } from "@/lib/billing";
+import { showToast } from "@/components/ui/toast";
 
 const ENTERPRISE_DEMO_URL =
   "https://calendly.com/blazly-marketing/blazly-demo?month=2026-06";
@@ -31,6 +38,31 @@ const BUSINESS_TIERS = [
 ] as const;
 
 function ProPlanCard() {
+  const { user } = useAuth();
+  const { isPro, businessSlots, loading, refreshPlan } = usePlan();
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleCheckout = async () => {
+    if (!user) {
+      showToast("error", "Please sign in to subscribe.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await startCheckout(user);
+      // Browser redirects to Stripe on success; refresh as a fallback.
+      await refreshPlan();
+    } catch (error) {
+      showToast(
+        "error",
+        error instanceof Error ? error.message : "Could not start checkout."
+      );
+      setSubmitting(false);
+    }
+  };
+
+  const hasPaid = isPro && businessSlots > 0;
+
   return (
     <div className="mx-auto max-w-md overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="bg-indigo-600 px-5 py-3.5 text-center text-white">
@@ -47,6 +79,13 @@ function ProPlanCard() {
         <p className="mt-0.5 text-[11px] text-slate-400">1 business included · add more at $29 each</p>
       </div>
 
+      {hasPaid && (
+        <div className="mx-5 flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
+          <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+          Active — {businessSlots} business {businessSlots === 1 ? "profile" : "profiles"} unlocked
+        </div>
+      )}
+
       <ul className="max-h-44 space-y-1.5 overflow-y-auto border-t border-slate-100 px-5 py-3.5">
         {PLAN_FEATURES.map((feature) => (
           <li key={feature} className="flex items-start gap-2 text-xs text-slate-700">
@@ -59,9 +98,20 @@ function ProPlanCard() {
       <div className="border-t border-slate-100 px-5 pb-5 pt-4">
         <Button
           type="button"
+          onClick={handleCheckout}
+          disabled={submitting || loading}
           className="h-10 w-full rounded-lg bg-blue-600 text-sm font-bold shadow-sm hover:bg-blue-700"
         >
-          Subscribe — $29/mo per business
+          {submitting ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Redirecting to checkout…
+            </>
+          ) : hasPaid ? (
+            "Pay again — add another business ($29/mo)"
+          ) : (
+            "Subscribe — $29/mo per business"
+          )}
         </Button>
         <p className="mt-2 text-center text-[11px] leading-relaxed text-slate-500">
           14-day money-back guarantee. No long-term contract.

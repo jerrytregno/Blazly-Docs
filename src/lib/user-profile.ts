@@ -31,6 +31,10 @@ function mapProfileData(userId: string, data: Record<string, unknown>): UserProf
     country: (data.country as string) ?? "",
     timeZone: (data.timeZone as string) ?? "America/New_York",
     plan: parsePlan(data.plan),
+    businessSlots: typeof data.businessSlots === "number" ? data.businessSlots : 0,
+    stripeCustomerId: (data.stripeCustomerId as string) ?? undefined,
+    stripeSubscriptionId: (data.stripeSubscriptionId as string) ?? undefined,
+    subscriptionStatus: (data.subscriptionStatus as string) ?? undefined,
     createdAt: toIso(data.createdAt),
     updatedAt: toIso(data.updatedAt),
   };
@@ -59,6 +63,7 @@ export async function ensureUserProfile(userId: string): Promise<void> {
     country: "",
     timeZone: "America/New_York",
     plan: "Free",
+    businessSlots: 0,
     onboardingComplete: false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

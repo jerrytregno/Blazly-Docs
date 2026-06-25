@@ -19,7 +19,13 @@ function passwordResetContinueUrl(): string {
   if (typeof window !== "undefined" && window.location.origin) {
     return `${window.location.origin}/login`;
   }
-  return "https://localseo.blazly.ai/login";
+
+  const base = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
+  if (!base) {
+    throw new Error("NEXT_PUBLIC_APP_URL is not configured. Add it to .env.local");
+  }
+
+  return `${base}/login`;
 }
 
 /** Sends a Firebase password reset email when the account uses email/password. */
