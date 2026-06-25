@@ -5,6 +5,11 @@ import type {
   ReviewItem,
   ReviewsDoc,
 } from "@/types/firestore";
+import {
+  MAX_UNANSWERED_BATCHES,
+  MAX_UNANSWERED_REVIEWS,
+  reviewHasWrittenText,
+} from "@/lib/seo/real-data";
 
 export interface AnalyzeResponse {
   business: Partial<BusinessDoc>;
@@ -45,104 +50,67 @@ export interface FetchReviewsProgress {
   isComplete: boolean;
 }
 
-export interface FetchReviewsResponse {
+export interface FetchUnansweredReviewsResponse {
   reviews: Partial<ReviewsDoc>;
+  newUnanswered: ReviewItem[];
   unansweredCount: number;
   answeredCount: number;
   placeTitle?: string;
   placeRating?: number;
+  canLoadMore: boolean;
+  unansweredBatchesLoaded: number;
 }
 
-interface FetchReviewsChunkResponse {
-  reviews: Partial<ReviewsDoc>;
-  reviewsInBatch?: ReviewItem[];
-  unansweredInBatch: ReviewItem[];
-  answeredInBatch: ReviewItem[];
-  scannedInBatch: number;
-  placeTitle?: string;
-  placeRating?: number;
-  nextPageToken?: string;
-  isComplete: boolean;
+interface FetchUnansweredReviewsApiResponse extends FetchUnansweredReviewsResponse {
   error?: string;
 }
 
-const PAGES_PER_REQUEST = 25;
-
-export async function fetchGoogleReviews(input: {
+export async function fetchUnansweredReviews(input: {
   mapsPlaceId: string;
   searchRegion?: string;
+  reset?: boolean;
+  nextPageToken?: string;
+  existingReviewIds?: string[];
+  unansweredBatchesLoaded?: number;
   onProgress?: (progress: FetchReviewsProgress) => void;
-}): Promise<FetchReviewsResponse> {
-  const allReviews: ReviewItem[] = [];
-  const seenIds = new Set<string>();
-  let nextPageToken: string | undefined;
-  let totalAnswered = 0;
-  let totalUnanswered = 0;
-  let totalScanned = 0;
-  let meta: Partial<ReviewsDoc> = {};
-  let placeTitle: string | undefined;
-  let placeRating: number | undefined;
-  let isComplete = false;
+}): Promise<FetchUnansweredReviewsResponse> {
+  const res = await fetch("/api/reviews/fetch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mapsPlaceId: input.mapsPlaceId,
+      searchRegion: input.searchRegion,
+      mode: "unanswered_batch",
+      reset: Boolean(input.reset),
+      nextPageToken: input.reset ? undefined : input.nextPageToken,
+      existingReviewIds: input.reset ? [] : input.existingReviewIds ?? [],
+      unansweredBatchesLoaded: input.reset ? 0 : input.unansweredBatchesLoaded ?? 0,
+    }),
+  });
 
-  while (true) {
-    const res = await fetch("/api/reviews/fetch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mapsPlaceId: input.mapsPlaceId,
-        searchRegion: input.searchRegion,
-        nextPageToken,
-        maxPages: PAGES_PER_REQUEST,
-      }),
-    });
-
-    const data = (await res.json()) as FetchReviewsChunkResponse;
-    if (!res.ok) {
-      throw new Error(data.error ?? "Failed to fetch reviews");
-    }
-
-    const batchReviews =
-      data.reviewsInBatch ??
-      [...(data.unansweredInBatch ?? []), ...(data.answeredInBatch ?? [])];
-
-    for (const review of batchReviews) {
-      if (seenIds.has(review.id)) continue;
-      seenIds.add(review.id);
-      allReviews.push(review);
-      if (review.replied) totalAnswered++;
-      else totalUnanswered++;
-    }
-
-    meta = { ...meta, ...data.reviews };
-    totalScanned = allReviews.length;
-    placeTitle = data.placeTitle ?? placeTitle;
-    placeRating = data.placeRating ?? placeRating;
-    isComplete = data.isComplete;
-    nextPageToken = data.nextPageToken;
-
-    input.onProgress?.({
-      scanned: totalScanned,
-      unanswered: totalUnanswered,
-      answered: totalAnswered,
-      totalOnGoogle: meta.totalOnGoogle,
-      isComplete: isComplete && !nextPageToken,
-    });
-
-    if (isComplete || !nextPageToken) break;
+  const data = (await res.json()) as FetchUnansweredReviewsApiResponse;
+  if (!res.ok) {
+    throw new Error(data.error ?? "Failed to fetch reviews");
   }
 
-  return {
-    reviews: {
-      ...meta,
-      inbox: allReviews,
-      scannedCount: totalScanned,
-      answeredCount: totalAnswered,
-      totalOnGoogle: meta.totalOnGoogle,
-      fetchedAt: new Date().toISOString(),
-    },
-    unansweredCount: totalUnanswered,
-    answeredCount: totalAnswered,
-    placeTitle,
-    placeRating,
-  };
+  input.onProgress?.({
+    scanned: data.reviews.scannedCount ?? data.newUnanswered.length,
+    unanswered: data.unansweredCount,
+    answered: data.answeredCount,
+    totalOnGoogle: data.reviews.totalOnGoogle,
+    isComplete: !data.canLoadMore,
+  });
+
+  return data;
+}
+
+export function canLoadMoreUnansweredReviews(reviews: ReviewsDoc | null): boolean {
+  if (!reviews) return false;
+  const batches = reviews.unansweredBatchesLoaded ?? 0;
+  const unanswered = reviews.inbox.filter(
+    (r) => !r.replied && reviewHasWrittenText(r.text)
+  ).length;
+  if (batches >= MAX_UNANSWERED_BATCHES) return false;
+  if (unanswered >= MAX_UNANSWERED_REVIEWS) return false;
+  return true;
 }

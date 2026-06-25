@@ -9,20 +9,30 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { parseGoogleMapsPlaceId } from "@/lib/seo/maps-place";
-import type { FetchReviewsProgress } from "@/lib/seo/client";
-
-type Filter = "unanswered" | "answered";
-
-const REVIEWS_PER_PAGE = 30;
+import {
+  canLoadMoreUnansweredReviews,
+  type FetchReviewsProgress,
+} from "@/lib/seo/client";
+import {
+  MAX_UNANSWERED_BATCHES,
+  MAX_UNANSWERED_REVIEWS,
+  UNANSWERED_BATCH_SIZE,
+  reviewHasWrittenText,
+} from "@/lib/seo/real-data";
 
 export default function ReviewManagementPage() {
-  const { reviews, business, dashboard, refreshReviews, saveReviews } = useData();
-  const [filter, setFilter] = useState<Filter>("unanswered");
+  const {
+    reviews,
+    business,
+    dashboard,
+    refreshReviews,
+    loadMoreUnansweredReviews,
+    saveReviews,
+  } = useData();
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [fetchError, setFetchError] = useState("");
   const [fetchProgress, setFetchProgress] = useState<FetchReviewsProgress | null>(null);
-  const [filterInitialized, setFilterInitialized] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(REVIEWS_PER_PAGE);
   const autoFetchStarted = useRef(false);
 
   const businessPlaceId = parseGoogleMapsPlaceId(business?.mapsPlaceId);
@@ -31,20 +41,23 @@ export default function ReviewManagementPage() {
   const hasMapsLink = Boolean(business?.mapsPlaceId?.trim());
 
   const inbox = reviews?.inbox ?? [];
-  const unanswered = useMemo(() => inbox.filter((r) => !r.replied), [inbox]);
-  const answered = useMemo(() => inbox.filter((r) => r.replied), [inbox]);
+  const unansweredWritten = useMemo(
+    () => inbox.filter((r) => !r.replied && reviewHasWrittenText(r.text)),
+    [inbox]
+  );
 
   const totalOnGoogle =
     reviews?.totalOnGoogle ?? dashboard?.metrics.totalReviews ?? inbox.length;
-  const loadedCount = inbox.length;
+  const batchesLoaded = reviews?.unansweredBatchesLoaded ?? 0;
+  const canLoadMore = canLoadMoreUnansweredReviews(reviews);
+  const batchesRemaining = Math.max(0, MAX_UNANSWERED_BATCHES - batchesLoaded);
 
-  const needsFullFetch = useMemo(() => {
+  const needsInitialFetch = useMemo(() => {
     if (!hasMapsLink) return false;
     if (reviewsStale) return true;
-    if (loadedCount === 0) return true;
-    if (totalOnGoogle > 0 && loadedCount < totalOnGoogle) return true;
+    if (unansweredWritten.length === 0 && batchesLoaded === 0) return true;
     return false;
-  }, [hasMapsLink, reviewsStale, loadedCount, totalOnGoogle]);
+  }, [hasMapsLink, reviewsStale, unansweredWritten.length, batchesLoaded]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -62,41 +75,39 @@ export default function ReviewManagementPage() {
     }
   }, [refreshReviews]);
 
+  const handleLoadMore = useCallback(async () => {
+    setLoadingMore(true);
+    setFetchError("");
+    try {
+      await loadMoreUnansweredReviews((progress) => {
+        setFetchProgress(progress);
+      });
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : "Failed to load more reviews");
+    } finally {
+      setLoadingMore(false);
+      setFetchProgress(null);
+    }
+  }, [loadMoreUnansweredReviews]);
+
   useEffect(() => {
     autoFetchStarted.current = false;
   }, [businessPlaceId]);
 
   useEffect(() => {
-    if (!needsFullFetch || autoFetchStarted.current || refreshing) return;
+    if (!needsInitialFetch || autoFetchStarted.current || refreshing) return;
     autoFetchStarted.current = true;
     void handleRefresh();
-  }, [needsFullFetch, refreshing, handleRefresh]);
+  }, [needsInitialFetch, refreshing, handleRefresh]);
 
-  useEffect(() => {
-    if (!filterInitialized && inbox.length > 0 && !refreshing) {
-      if (unanswered.length > 0) setFilter("unanswered");
-      else if (answered.length > 0) setFilter("answered");
-      setFilterInitialized(true);
-    }
-  }, [filterInitialized, inbox.length, unanswered.length, answered.length, refreshing]);
-
-  useEffect(() => {
-    setVisibleCount(REVIEWS_PER_PAGE);
-  }, [filter]);
-
-  const listReviews = filter === "unanswered" ? unanswered : answered;
-  const visibleReviews = listReviews.slice(0, visibleCount);
-  const hasMore = visibleCount < listReviews.length;
-
-  const progressScanned = fetchProgress?.scanned ?? loadedCount;
-  const progressUnanswered = fetchProgress?.unanswered ?? unanswered.length;
-  const progressAnswered = fetchProgress?.answered ?? answered.length;
-  const progressTotal = fetchProgress?.totalOnGoogle ?? totalOnGoogle;
+  const busy = refreshing || loadingMore;
 
   const avgRating =
     dashboard?.metrics.averageRating ??
-    (inbox.length > 0
-      ? Math.round((inbox.reduce((s, r) => s + r.rating, 0) / inbox.length) * 10) / 10
+    (unansweredWritten.length > 0
+      ? Math.round(
+          (unansweredWritten.reduce((s, r) => s + r.rating, 0) / unansweredWritten.length) * 10
+        ) / 10
       : 0);
 
   const markReplied = async (id: string) => {
@@ -110,24 +121,8 @@ export default function ReviewManagementPage() {
     });
   };
 
-  const filters: { id: Filter; label: string; count: number }[] = [
-    { id: "unanswered", label: "Unanswered", count: refreshing ? progressUnanswered : unanswered.length },
-    { id: "answered", label: "Answered", count: refreshing ? progressAnswered : answered.length },
-  ];
-
-  const fetchButtonLabel = () => {
-    if (!refreshing) return "Refresh reviews";
-    if (!fetchProgress) return "Fetching all reviews…";
-    const progressText = progressTotal
-      ? `${progressScanned}/${progressTotal}`
-      : `${progressScanned}`;
-    return `Fetching… ${progressText}`;
-  };
-
-  const showBlockingLoader =
-    hasMapsLink &&
-    (refreshing || needsFullFetch) &&
-    (loadedCount === 0 || (totalOnGoogle > 0 && loadedCount < totalOnGoogle));
+  const showInitialLoader =
+    hasMapsLink && needsInitialFetch && refreshing && unansweredWritten.length === 0;
 
   return (
     <PageDataGuard>
@@ -136,22 +131,37 @@ export default function ReviewManagementPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Review Management</h1>
             <p className="mt-1 text-gray-600">
-              All Google reviews load automatically. Filter by answered or unanswered and reply with AI.
+              Loads the latest {UNANSWERED_BATCH_SIZE} unanswered written reviews at a time (up to{" "}
+              {MAX_UNANSWERED_REVIEWS}). Reply with AI and post on Google Business Profile.
             </p>
           </div>
-          <Button
-            variant="outline"
-            onClick={handleRefresh}
-            disabled={refreshing || !hasMapsLink}
-            className="gap-2"
-          >
-            {refreshing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
+          <div className="flex flex-wrap gap-2">
+            {canLoadMore && (
+              <Button
+                onClick={handleLoadMore}
+                disabled={busy || !hasMapsLink}
+                className="gap-2"
+              >
+                {loadingMore ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : null}
+                Load next {UNANSWERED_BATCH_SIZE} unanswered
+              </Button>
             )}
-            {fetchButtonLabel()}
-          </Button>
+            <Button
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={busy || !hasMapsLink}
+              className="gap-2"
+            >
+              {refreshing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {refreshing ? "Refreshing…" : "Refresh latest 20"}
+            </Button>
+          </div>
         </div>
 
         {!hasMapsLink && (
@@ -163,13 +173,13 @@ export default function ReviewManagementPage() {
           </Card>
         )}
 
-        {reviewsStale && !refreshing && (
+        {reviewsStale && !busy && (
           <Card className="border-amber-200 bg-amber-50">
             <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm text-amber-900">
               <div className="flex items-start gap-3">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
-                  These reviews may be from a different business. Refreshing after updating your Maps link.
+                  These reviews may be from a different business. Refresh after updating your Maps link.
                 </span>
               </div>
             </CardContent>
@@ -180,7 +190,7 @@ export default function ReviewManagementPage() {
           <Card className="border-red-200 bg-red-50">
             <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm text-red-800">
               <span>{fetchError}</span>
-              <Button size="sm" variant="outline" onClick={handleRefresh} disabled={refreshing}>
+              <Button size="sm" variant="outline" onClick={handleRefresh} disabled={busy}>
                 Try again
               </Button>
             </CardContent>
@@ -191,19 +201,19 @@ export default function ReviewManagementPage() {
           {[
             {
               label: "Total on Google",
-              value: String(progressTotal || "—"),
+              value: String(totalOnGoogle || "—"),
               icon: MessageSquare,
             },
             {
-              label: "Answered",
-              value: String(refreshing ? progressAnswered : answered.length),
+              label: "Loaded unanswered",
+              value: `${unansweredWritten.length}/${MAX_UNANSWERED_REVIEWS}`,
               icon: MessageSquare,
             },
             {
-              label: "Unanswered",
-              value: String(refreshing ? progressUnanswered : unanswered.length),
+              label: "Batches loaded",
+              value: `${batchesLoaded}/${MAX_UNANSWERED_BATCHES}`,
               icon: MessageSquare,
-              highlight: (refreshing ? progressUnanswered : unanswered.length) > 0,
+              highlight: unansweredWritten.length > 0,
             },
             {
               label: "Average rating",
@@ -232,36 +242,29 @@ export default function ReviewManagementPage() {
           ))}
         </div>
 
-        {showBlockingLoader ? (
+        {showInitialLoader ? (
           <Card className="border-gray-200 bg-white">
             <CardContent className="flex flex-col items-center justify-center py-20 text-center">
               <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
-              <p className="mt-4 font-medium text-gray-900">Loading all Google reviews</p>
+              <p className="mt-4 font-medium text-gray-900">Loading latest unanswered reviews</p>
               <p className="mt-1 text-sm text-gray-500">
-                {progressTotal
-                  ? `${progressScanned} of ${progressTotal} reviews fetched`
-                  : `${progressScanned} reviews fetched so far`}
+                Fetching up to {UNANSWERED_BATCH_SIZE} newest written reviews without owner replies
               </p>
-              {fetchProgress && (
-                <p className="mt-2 text-xs text-gray-400">
-                  {progressUnanswered} unanswered · {progressAnswered} answered
-                </p>
-              )}
             </CardContent>
           </Card>
-        ) : inbox.length === 0 ? (
+        ) : unansweredWritten.length === 0 && !busy ? (
           <Card className="border-gray-200 bg-white">
             <CardContent className="py-16 text-center">
               <MessageSquare className="mx-auto h-10 w-10 text-gray-300" />
-              <p className="mt-4 font-medium text-gray-900">No Google reviews found</p>
+              <p className="mt-4 font-medium text-gray-900">No written unanswered reviews</p>
               <p className="mt-1 text-sm text-gray-500">
                 {hasMapsLink
-                  ? "We could not load reviews for this business. Try refreshing."
+                  ? "No unanswered reviews with text in this batch. Load more or refresh to check older reviews."
                   : "Add your Google Maps link in Business Settings first."}
               </p>
-              {hasMapsLink && (
-                <Button className="mt-6" onClick={handleRefresh} disabled={refreshing}>
-                  Refresh reviews
+              {hasMapsLink && canLoadMore && (
+                <Button className="mt-6" onClick={handleLoadMore} disabled={busy}>
+                  Load next {UNANSWERED_BATCH_SIZE} unanswered
                 </Button>
               )}
             </CardContent>
@@ -272,57 +275,67 @@ export default function ReviewManagementPage() {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Google reviews</h2>
                 <p className="text-sm text-gray-500">
-                  {filter === "unanswered"
-                    ? "Generate an AI reply, copy it, and post on Google Business Profile."
-                    : "Reviews you have already replied to on Google."}
+                  {unansweredWritten.length} unanswered written review
+                  {unansweredWritten.length === 1 ? "" : "s"} (max {MAX_UNANSWERED_REVIEWS}).
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {filters.map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setFilter(f.id)}
-                    className={cn(
-                      "rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
-                      filter === f.id
-                        ? "border-indigo-600 bg-indigo-50 text-indigo-700"
-                        : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                    )}
-                  >
-                    {f.label} ({f.count})
-                  </button>
-                ))}
-              </div>
+              {canLoadMore && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLoadMore}
+                  disabled={busy}
+                  className="gap-2"
+                >
+                  {loadingMore ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : null}
+                  Load next {UNANSWERED_BATCH_SIZE}
+                </Button>
+              )}
             </div>
 
-            {listReviews.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                {filter === "unanswered"
-                  ? "No unanswered reviews."
-                  : "No answered reviews yet."}
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {visibleReviews.map((review) => (
-                  <GoogleReviewCard
-                    key={review.id}
-                    review={review}
-                    highlightUnanswered={!review.replied}
-                    onMarkReplied={!review.replied ? markReplied : undefined}
-                  />
-                ))}
-                {hasMore && (
-                  <div className="flex justify-center pt-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setVisibleCount((n) => n + REVIEWS_PER_PAGE)}
-                    >
-                      Load more ({listReviews.length - visibleCount} remaining)
-                    </Button>
-                  </div>
-                )}
+            <div className="space-y-3">
+              {unansweredWritten.map((review) => (
+                <GoogleReviewCard
+                  key={review.id}
+                  review={review}
+                  highlightUnanswered
+                  onMarkReplied={markReplied}
+                />
+              ))}
+            </div>
+
+            {canLoadMore && (
+              <div className="flex flex-col items-center gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={handleLoadMore}
+                  disabled={busy}
+                  className="gap-2"
+                >
+                  {loadingMore ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  Load next {UNANSWERED_BATCH_SIZE} unanswered
+                </Button>
+                <p className="text-xs text-gray-500">
+                  {batchesRemaining} more batch{batchesRemaining === 1 ? "" : "es"} available
+                  {fetchProgress && loadingMore
+                    ? ` · scanned ${fetchProgress.scanned} on Google`
+                    : ""}
+                </p>
               </div>
+            )}
+
+            {!canLoadMore && batchesLoaded > 0 && (
+              <p className="text-center text-xs text-gray-500">
+                {unansweredWritten.length >= MAX_UNANSWERED_REVIEWS
+                  ? `Showing the maximum of ${MAX_UNANSWERED_REVIEWS} unanswered written reviews.`
+                  : batchesLoaded >= MAX_UNANSWERED_BATCHES
+                    ? "All 5 batches loaded. Refresh to start over from the newest reviews."
+                    : "No more unanswered written reviews to load from Google."}
+              </p>
             )}
           </section>
         )}

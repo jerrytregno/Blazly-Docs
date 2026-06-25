@@ -7,9 +7,11 @@ import type { CompetitorDeepDive } from "@/types/firestore";
 export function CompetitorPanel({
   detail,
   loading,
+  yourPosition,
 }: {
   detail?: CompetitorDeepDive;
   loading?: boolean;
+  yourPosition?: number;
 }) {
   if (loading) {
     return (
@@ -23,11 +25,14 @@ export function CompetitorPanel({
     return (
       <Card className="border-dashed border-gray-300 bg-gray-50">
         <CardContent className="p-6 text-sm text-gray-500">
-          Click a competitor in the ranking list to see why they rank higher and how you compare.
+          Click a competitor in the ranking list to see their profile and how you compare.
         </CardContent>
       </Card>
     );
   }
+
+  const showWhyTheyRankHigher =
+    yourPosition == null || yourPosition > detail.position;
 
   return (
     <div className="space-y-4">
@@ -59,19 +64,21 @@ export function CompetitorPanel({
         </CardContent>
       </Card>
 
-      <Card className="border-amber-200 bg-amber-50/40">
-        <CardContent className="p-6">
-          <h4 className="font-semibold text-gray-900">Why they rank higher</h4>
-          <ul className="mt-3 space-y-2 text-sm text-gray-700">
-            {detail.whyTheyRankHigher.map((reason) => (
-              <li key={reason} className="flex gap-2">
-                <Star className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                {reason}
-              </li>
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+      {showWhyTheyRankHigher && (
+        <Card className="border-amber-200 bg-amber-50/40">
+          <CardContent className="p-6">
+            <h4 className="font-semibold text-gray-900">Why they rank higher</h4>
+            <ul className="mt-3 space-y-2 text-sm text-gray-700">
+              {detail.whyTheyRankHigher.map((reason) => (
+                <li key={reason} className="flex gap-2">
+                  <Star className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                  {reason}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="border-gray-200">
         <CardContent className="p-6">

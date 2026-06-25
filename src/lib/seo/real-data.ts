@@ -83,6 +83,10 @@ function formatReviewDate(r: GoogleMapsReview): string {
   }
 }
 
+export function reviewHasWrittenText(text?: string | null): boolean {
+  return Boolean(text?.trim());
+}
+
 export function reviewsToInbox(
   reviews: GoogleMapsReview[],
   placeId: string
@@ -118,6 +122,112 @@ export interface FetchGoogleReviewsResult {
 const REVIEWS_PER_PAGE = 20;
 const DEFAULT_CHUNK_PAGES = 10;
 const MAX_PAGES_SAFETY = 500;
+
+export const UNANSWERED_BATCH_SIZE = 20;
+export const MAX_UNANSWERED_BATCHES = 5;
+export const MAX_UNANSWERED_REVIEWS = 100;
+const MAX_PAGES_PER_UNANSWERED_BATCH = 15;
+
+function reviewStableId(r: GoogleMapsReview, placeId: string, index: number): string {
+  return r.review_id ?? `${placeId}-${index}`;
+}
+
+function extractNextReviewPageToken(
+  data: GoogleMapsReviewsResponse
+): string | undefined {
+  return (
+    data.pagination?.next_page_token ??
+    (data as GoogleMapsReviewsResponse & { next_page_token?: string }).next_page_token
+  );
+}
+
+/** Fetch up to 20 new unanswered reviews (one user batch). */
+export async function fetchUnansweredReviewsBatch(
+  placeId: string,
+  options: {
+    gl?: string;
+    nextPageToken?: string;
+    existingIds?: string[];
+    targetCount?: number;
+  } = {}
+): Promise<FetchGoogleReviewsResult> {
+  const target = options.targetCount ?? UNANSWERED_BATCH_SIZE;
+  const seen = new Set(options.existingIds ?? []);
+  const batchUnanswered: GoogleMapsReview[] = [];
+  let nextToken = options.nextPageToken;
+  let placeMeta: GoogleMapsReviewsResponse["place_result"];
+  let histogram: Record<string, number> | undefined;
+  let pagesFetched = 0;
+  let reviewsScanned = 0;
+  let answeredScanned = 0;
+
+  while (
+    batchUnanswered.length < target &&
+    pagesFetched < MAX_PAGES_PER_UNANSWERED_BATCH
+  ) {
+    const data = await fetchGoogleMapsReviews(placeId, {
+      sort_by: "newest",
+      num: REVIEWS_PER_PAGE,
+      next_page_token: nextToken,
+      gl: options.gl,
+    });
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    if (!placeMeta) {
+      placeMeta = data.place_result;
+      histogram = data.place_result?.reviews_histogram;
+    }
+
+    const batch = data.reviews ?? [];
+    if (batch.length === 0) {
+      nextToken = undefined;
+      break;
+    }
+
+    for (let i = 0; i < batch.length; i++) {
+      const review = batch[i];
+      reviewsScanned++;
+      if (hasOwnerResponse(review)) {
+        answeredScanned++;
+        continue;
+      }
+      const body = reviewBody(review);
+      if (!body.trim()) continue;
+
+      const id = reviewStableId(review, placeId, reviewsScanned);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      batchUnanswered.push(review);
+      if (batchUnanswered.length >= target) break;
+    }
+
+    pagesFetched++;
+    nextToken = extractNextReviewPageToken(data);
+    if (!nextToken) break;
+  }
+
+  const unanswered = reviewsToInbox(batchUnanswered, placeId);
+
+  return {
+    inbox: unanswered,
+    unanswered,
+    answered: [],
+    sentiment: histogramToSentiment(histogram),
+    histogram,
+    placeRating: placeMeta?.rating,
+    placeReviewCount: placeMeta?.reviews,
+    placeTitle: placeMeta?.title,
+    scannedCount: reviewsScanned,
+    answeredCount: answeredScanned,
+    placeId,
+    fetchedAt: new Date().toISOString(),
+    nextPageToken: nextToken,
+    isComplete: !nextToken,
+  };
+}
 
 export async function fetchGoogleReviewsChunk(
   placeId: string,
@@ -174,7 +284,7 @@ export async function fetchGoogleReviewsChunk(
     }
 
     pagesFetched++;
-    nextToken = data.pagination?.next_page_token;
+    nextToken = extractNextReviewPageToken(data);
     if (!nextToken) break;
   }
 

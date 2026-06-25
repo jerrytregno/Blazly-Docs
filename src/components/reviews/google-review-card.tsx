@@ -115,9 +115,7 @@ export function GoogleReviewCard({
             <div className="mt-2">
               <StarRating rating={review.rating} />
             </div>
-            <p className="mt-3 text-sm leading-relaxed text-gray-700">
-              {review.text || <span className="italic text-gray-400">No written review</span>}
-            </p>
+            <p className="mt-3 text-sm leading-relaxed text-gray-700">{review.text}</p>
             {review.date && (
               <p className="mt-2 text-xs text-gray-400">{review.date}</p>
             )}

@@ -1,18 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseGoogleMapsPlaceId } from "@/lib/seo/maps-place";
-import { fetchGoogleReviewsChunk } from "@/lib/seo/real-data";
+import {
+  fetchUnansweredReviewsBatch,
+  MAX_UNANSWERED_BATCHES,
+  MAX_UNANSWERED_REVIEWS,
+} from "@/lib/seo/real-data";
 import { regionGl } from "@/lib/seo/search-regions";
 
-export const maxDuration = 300;
+export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { mapsPlaceId, searchRegion, nextPageToken, maxPages } = body as {
+    const {
+      mapsPlaceId,
+      searchRegion,
+      mode,
+      reset,
+      nextPageToken,
+      existingReviewIds,
+      unansweredBatchesLoaded,
+    } = body as {
       mapsPlaceId?: string;
       searchRegion?: string;
+      mode?: string;
+      reset?: boolean;
       nextPageToken?: string;
-      maxPages?: number;
+      existingReviewIds?: string[];
+      unansweredBatchesLoaded?: number;
     };
 
     const placeId = parseGoogleMapsPlaceId(mapsPlaceId);
@@ -23,41 +38,58 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (mode !== "unanswered_batch") {
+      return NextResponse.json(
+        { error: "Unsupported fetch mode. Use unanswered_batch." },
+        { status: 400 }
+      );
+    }
+
+    const priorBatches = reset ? 0 : unansweredBatchesLoaded ?? 0;
+    if (!reset && priorBatches >= MAX_UNANSWERED_BATCHES) {
+      return NextResponse.json(
+        { error: "Maximum of 5 review batches (100 unanswered) already loaded." },
+        { status: 400 }
+      );
+    }
+
     const gl = regionGl(searchRegion);
-    const data = await fetchGoogleReviewsChunk(placeId, {
+    const data = await fetchUnansweredReviewsBatch(placeId, {
       gl,
-      nextPageToken,
-      maxPages: maxPages ?? 25,
-      unansweredOnly: false,
+      nextPageToken: reset ? undefined : nextPageToken,
+      existingIds: reset ? [] : existingReviewIds ?? [],
     });
+
+    const newBatchCount = priorBatches + 1;
+    const canLoadMore =
+      Boolean(data.nextPageToken) && newBatchCount < MAX_UNANSWERED_BATCHES;
 
     return NextResponse.json({
       reviews: {
-        inbox: data.inbox,
+        inbox: data.unanswered,
         sentiment: data.sentiment,
         placeId: data.placeId,
         fetchedAt: data.fetchedAt,
         scannedCount: data.scannedCount,
         totalOnGoogle: data.placeReviewCount,
-        answeredCount: data.answered.length,
+        answeredCount: data.answeredCount,
+        nextPageToken: data.nextPageToken,
+        unansweredBatchesLoaded: newBatchCount,
         monitoredPlatforms: [
           {
             name: "Google",
-            count: data.placeReviewCount ?? data.inbox.length,
+            count: data.placeReviewCount ?? data.unanswered.length,
             connected: true,
           },
         ],
       },
-      reviewsInBatch: data.inbox,
-      unansweredInBatch: data.unanswered,
-      answeredInBatch: data.answered,
-      scannedInBatch: data.scannedCount,
+      newUnanswered: data.unanswered,
       unansweredCount: data.unanswered.length,
-      answeredCount: data.answered.length,
+      answeredCount: data.answeredCount,
       placeTitle: data.placeTitle,
       placeRating: data.placeRating,
-      nextPageToken: data.nextPageToken,
-      isComplete: data.isComplete,
+      canLoadMore,
+      unansweredBatchesLoaded: newBatchCount,
     });
   } catch (error) {
     console.error("Review fetch error:", error);

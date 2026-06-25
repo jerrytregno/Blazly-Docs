@@ -1,5 +1,7 @@
 "use client";
 
+import { Loader2, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -8,17 +10,23 @@ export function KeywordResearchFilters({
   location,
   onCategoryChange,
   onLocationChange,
+  onSearch,
+  searching,
   disabled,
 }: {
   category: string;
   location: string;
   onCategoryChange: (value: string) => void;
   onLocationChange: (value: string) => void;
+  onSearch: () => void;
+  searching?: boolean;
   disabled?: boolean;
 }) {
+  const canSearch = Boolean(category.trim() && location.trim());
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <div className="space-y-2">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+      <div className="min-w-0 flex-1 space-y-2">
         <Label htmlFor="kr-category">Category</Label>
         <Input
           id="kr-category"
@@ -26,10 +34,13 @@ export function KeywordResearchFilters({
           value={category}
           disabled={disabled}
           onChange={(e) => onCategoryChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && canSearch && !disabled) onSearch();
+          }}
         />
       </div>
 
-      <div className="space-y-2">
+      <div className="min-w-0 flex-1 space-y-2">
         <Label htmlFor="kr-location">Location</Label>
         <Input
           id="kr-location"
@@ -37,8 +48,25 @@ export function KeywordResearchFilters({
           value={location}
           disabled={disabled}
           onChange={(e) => onLocationChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && canSearch && !disabled) onSearch();
+          }}
         />
       </div>
+
+      <Button
+        type="button"
+        onClick={onSearch}
+        disabled={disabled || !canSearch || searching}
+        className="w-full shrink-0 gap-2 sm:w-auto"
+      >
+        {searching ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Search className="h-4 w-4" />
+        )}
+        Search
+      </Button>
     </div>
   );
 }

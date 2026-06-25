@@ -169,6 +169,10 @@ export interface ReviewsDoc {
   totalOnGoogle?: number;
   /** Answered reviews found while scanning (not stored in inbox) */
   answeredCount?: number;
+  /** Pagination token for the next unanswered review batch */
+  nextPageToken?: string;
+  /** How many unanswered batches have been loaded (max 5) */
+  unansweredBatchesLoaded?: number;
 }
 
 export interface Competitor {

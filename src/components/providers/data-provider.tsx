@@ -7,7 +7,9 @@ import {
   useEffect,
   useRef,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 import { useAuth } from "@/components/providers/auth-provider";
 import { getUserProfile } from "@/lib/user-profile";
@@ -19,7 +21,8 @@ import {
   updateReviews,
   updateRankings,
 } from "@/lib/firestore/collections";
-import { fetchGoogleReviews, fetchSeoAnalysis, type FetchReviewsProgress } from "@/lib/seo/client";
+import { fetchUnansweredReviews, fetchSeoAnalysis, type FetchReviewsProgress } from "@/lib/seo/client";
+import { MAX_UNANSWERED_REVIEWS } from "@/lib/seo/real-data";
 import { resolveSearchLocation } from "@/lib/seo/analysis-location";
 import {
   DEFAULT_SEARCH_REGION,
@@ -49,6 +52,7 @@ interface DataContextValue {
   refresh: () => Promise<void>;
   runAnalysis: (override?: Partial<BusinessDoc> & { searchRegion?: string }) => Promise<void>;
   refreshReviews: (onProgress?: (progress: FetchReviewsProgress) => void) => Promise<void>;
+  loadMoreUnansweredReviews: (onProgress?: (progress: FetchReviewsProgress) => void) => Promise<void>;
   saveBusiness: (data: Partial<BusinessDoc>) => Promise<void>;
   saveDashboard: (data: Partial<DashboardDoc>) => Promise<void>;
   saveReviews: (data: Partial<ReviewsDoc>) => Promise<void>;
@@ -64,6 +68,79 @@ function compactReviewsForStorage(inbox: ReviewItem[]): ReviewItem[] {
     text:
       review.text.length > 500 ? `${review.text.slice(0, 497)}...` : review.text,
   }));
+}
+
+function mergeUnansweredBatches(
+  existing: ReviewItem[],
+  newBatch: ReviewItem[]
+): ReviewItem[] {
+  const answered = existing.filter((r) => r.replied);
+  const byId = new Map<string, ReviewItem>();
+  for (const r of existing.filter((r) => !r.replied)) {
+    byId.set(r.id, r);
+  }
+  for (const r of newBatch.filter((r) => !r.replied)) {
+    byId.set(r.id, r);
+  }
+  const unanswered = Array.from(byId.values()).slice(0, MAX_UNANSWERED_REVIEWS);
+  return [...unanswered, ...answered];
+}
+
+async function persistReviewFetch(
+  userId: string,
+  result: Awaited<ReturnType<typeof fetchUnansweredReviews>>,
+  inbox: ReviewItem[],
+  dashboard: DashboardDoc | null,
+  setReviews: Dispatch<SetStateAction<ReviewsDoc | null>>,
+  setDashboard: Dispatch<SetStateAction<DashboardDoc | null>>
+) {
+  const reviewUpdate: Partial<ReviewsDoc> = {
+    ...result.reviews,
+    inbox: compactReviewsForStorage(inbox),
+    answeredCount: inbox.filter((r) => r.replied).length,
+    nextPageToken: result.reviews.nextPageToken,
+    unansweredBatchesLoaded: result.unansweredBatchesLoaded,
+  };
+
+  try {
+    await updateReviews(userId, reviewUpdate);
+  } catch (error) {
+    console.error("Failed to persist reviews to Firestore:", error);
+  }
+
+  setReviews((prev) => ({
+    userId,
+    campaigns: prev?.campaigns ?? [],
+    reviewGoal: prev?.reviewGoal ?? { needed: 10, target: "local leader", currentGap: 0 },
+    ...prev,
+    ...reviewUpdate,
+    inbox,
+  }));
+
+  if (result.placeRating != null || result.reviews.totalOnGoogle != null) {
+    const metrics = {
+      ...(result.reviews.totalOnGoogle != null
+        ? { totalReviews: result.reviews.totalOnGoogle }
+        : {}),
+      ...(result.placeRating != null ? { averageRating: result.placeRating } : {}),
+    };
+    if (Object.keys(metrics).length > 0) {
+      await updateDashboard(userId, {
+        metrics: {
+          ...(dashboard?.metrics ?? {}),
+          ...metrics,
+        } as DashboardDoc["metrics"],
+      });
+      setDashboard((prev) =>
+        prev
+          ? {
+              ...prev,
+              metrics: { ...prev.metrics, ...metrics },
+            }
+          : prev
+      );
+    }
+  }
 }
 
 export function DataProvider({ children }: { children: ReactNode }) {
@@ -229,71 +306,72 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const refreshReviews = useCallback(
     async (onProgress?: (progress: FetchReviewsProgress) => void) => {
-    if (!user) return;
-    const mapsPlaceId = business?.mapsPlaceId?.trim();
-    if (!mapsPlaceId) {
-      throw new Error("Add a Google Maps link in Business Settings first.");
-    }
-
-    const activeRegion = resolveSearchRegionId(
-      dashboard?.searchRegion ?? searchRegion,
-      business?.country
-    );
-
-    const result = await fetchGoogleReviews({
-      mapsPlaceId,
-      searchRegion: activeRegion,
-      onProgress,
-    });
-
-    const inbox = result.reviews.inbox ?? [];
-    const reviewUpdate: Partial<ReviewsDoc> = {
-      ...result.reviews,
-      inbox: inbox.length > 200 ? compactReviewsForStorage(inbox) : inbox,
-      answeredCount: result.answeredCount,
-    };
-
-    try {
-      await updateReviews(user.uid, reviewUpdate);
-    } catch (error) {
-      console.error("Failed to persist reviews to Firestore:", error);
-    }
-    setReviews((prev) =>
-      prev
-        ? {
-            ...prev,
-            ...reviewUpdate,
-            inbox,
-          }
-        : prev
-    );
-
-    if (result.placeRating != null || result.reviews.totalOnGoogle != null) {
-      const metrics = {
-        ...(result.reviews.totalOnGoogle != null
-          ? { totalReviews: result.reviews.totalOnGoogle }
-          : {}),
-        ...(result.placeRating != null ? { averageRating: result.placeRating } : {}),
-      };
-      if (Object.keys(metrics).length > 0) {
-        await updateDashboard(user.uid, {
-          metrics: {
-            ...(dashboard?.metrics ?? {}),
-            ...metrics,
-          } as DashboardDoc["metrics"],
-        });
-        setDashboard((prev) =>
-          prev
-            ? {
-                ...prev,
-                metrics: { ...prev.metrics, ...metrics },
-              }
-            : prev
-        );
+      if (!user) return;
+      const mapsPlaceId = business?.mapsPlaceId?.trim();
+      if (!mapsPlaceId) {
+        throw new Error("Add a Google Maps link in Business Settings first.");
       }
-    }
-  },
+
+      const activeRegion = resolveSearchRegionId(
+        dashboard?.searchRegion ?? searchRegion,
+        business?.country
+      );
+
+      const result = await fetchUnansweredReviews({
+        mapsPlaceId,
+        searchRegion: activeRegion,
+        reset: true,
+        onProgress,
+      });
+
+      const inbox = result.newUnanswered;
+      await persistReviewFetch(
+        user.uid,
+        result,
+        inbox,
+        dashboard,
+        setReviews,
+        setDashboard
+      );
+    },
     [user, business, dashboard, searchRegion]
+  );
+
+  const loadMoreUnansweredReviews = useCallback(
+    async (onProgress?: (progress: FetchReviewsProgress) => void) => {
+      if (!user) return;
+      const mapsPlaceId = business?.mapsPlaceId?.trim();
+      if (!mapsPlaceId) {
+        throw new Error("Add a Google Maps link in Business Settings first.");
+      }
+
+      const activeRegion = resolveSearchRegionId(
+        dashboard?.searchRegion ?? searchRegion,
+        business?.country
+      );
+
+      const existingInbox = reviews?.inbox ?? [];
+      const result = await fetchUnansweredReviews({
+        mapsPlaceId,
+        searchRegion: activeRegion,
+        reset: false,
+        nextPageToken: reviews?.nextPageToken,
+        existingReviewIds: existingInbox.map((r) => r.id),
+        unansweredBatchesLoaded: reviews?.unansweredBatchesLoaded ?? 0,
+        onProgress,
+      });
+
+      const inbox = mergeUnansweredBatches(existingInbox, result.newUnanswered);
+      await persistReviewFetch(
+        user.uid,
+        result,
+        inbox,
+        dashboard,
+        setReviews,
+        setDashboard
+      );
+    },
+    [user, business, dashboard, searchRegion, reviews]
   );
 
   useEffect(() => {
@@ -379,6 +457,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         refresh,
         runAnalysis,
         refreshReviews,
+        loadMoreUnansweredReviews,
         saveBusiness,
         saveDashboard,
         saveReviews,

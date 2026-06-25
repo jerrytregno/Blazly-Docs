@@ -49,7 +49,6 @@ export default function RankTrackerPage() {
   const [error, setError] = useState("");
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | undefined>();
   const lastSearchKey = useRef("");
-  const filtersReady = useRef(false);
 
   useEffect(() => {
     if (!business) return;
@@ -65,9 +64,12 @@ export default function RankTrackerPage() {
     }
   }, [business, businessLocation]);
 
-  const activeCategory = category.trim() || business?.primaryCategory || "Local business";
-  const activeLocation = location.trim() || businessLocation;
-  const searchHeading = buildSearchQuery(activeCategory, activeLocation);
+  const activeCategory = category.trim();
+  const activeLocation = location.trim();
+  const canSearch = Boolean(activeCategory && activeLocation);
+  const searchHeading = canSearch
+    ? buildSearchQuery(activeCategory, activeLocation)
+    : "";
 
   const runSearch = useCallback(
     async (opts?: {
@@ -79,8 +81,8 @@ export default function RankTrackerPage() {
     }) => {
       if (!user) return;
 
-      const searchCategory = opts?.category ?? activeCategory;
-      const searchLocation = opts?.location ?? activeLocation;
+      const searchCategory = (opts?.category ?? activeCategory).trim();
+      const searchLocation = (opts?.location ?? activeLocation).trim();
       if (!searchLocation || !searchCategory) return;
 
       const searchKey = `${searchCategory}|${searchLocation}`;
@@ -150,7 +152,6 @@ export default function RankTrackerPage() {
       /* ignore load errors */
     } finally {
       setLoading(false);
-      filtersReady.current = true;
     }
   }, [user, businessLocation]);
 
@@ -158,18 +159,24 @@ export default function RankTrackerPage() {
     void loadStored();
   }, [loadStored]);
 
-  useEffect(() => {
-    if (!user || loading || !filtersReady.current) return;
-    if (!activeLocation.trim() || !activeCategory.trim()) return;
-
-    const timer = window.setTimeout(() => {
-      void runSearch({ category: activeCategory, location: activeLocation });
-    }, 600);
-
-    return () => window.clearTimeout(timer);
-  }, [user, loading, category, location, activeCategory, activeLocation, runSearch]);
+  const handleSearch = () => {
+    if (!activeCategory || !activeLocation) {
+      setError("Enter both category and location, then click Search.");
+      return;
+    }
+    setError("");
+    void runSearch({
+      category: activeCategory,
+      location: activeLocation,
+      force: true,
+    });
+  };
 
   const handleRefresh = () => {
+    if (!activeCategory || !activeLocation) {
+      setError("Enter both category and location, then click Search.");
+      return;
+    }
     void runSearch({ category: activeCategory, location: activeLocation, force: true });
   };
 
@@ -177,7 +184,13 @@ export default function RankTrackerPage() {
     if (!listing.placeId || listing.isYou) return;
     setSelectedPlaceId(listing.placeId);
     setCompetitorLoading(true);
-    void runSearch({ competitorPlaceId: listing.placeId, location: activeLocation });
+    const searchCategory = report?.category ?? activeCategory;
+    const searchLocation = report?.location ?? activeLocation;
+    void runSearch({
+      competitorPlaceId: listing.placeId,
+      category: searchCategory,
+      location: searchLocation,
+    });
   };
 
   const handleGenerateStrategy = async () => {
@@ -210,13 +223,23 @@ export default function RankTrackerPage() {
             <h1 className="text-2xl font-bold text-gray-900">Rank Tracker</h1>
             <p className="mt-1 text-gray-600">Local Maps Rankings for:</p>
             <p className="text-lg font-semibold text-gray-900">
-              &ldquo;{report?.query ?? searchHeading}&rdquo;
+              {report?.query ? (
+                <>&ldquo;{report.query}&rdquo;</>
+              ) : searchHeading ? (
+                <span className="text-gray-500">
+                  &ldquo;{searchHeading}&rdquo; <span className="text-sm font-normal">(click Search)</span>
+                </span>
+              ) : (
+                <span className="text-base font-normal text-gray-500">
+                  Enter category and location, then click Search
+                </span>
+              )}
             </p>
           </div>
           <Button
             variant="outline"
             onClick={handleRefresh}
-            disabled={busy || !activeLocation}
+            disabled={busy || !canSearch}
             className="gap-2"
           >
             {searching ? (
@@ -235,6 +258,8 @@ export default function RankTrackerPage() {
               location={location}
               onCategoryChange={setCategory}
               onLocationChange={setLocation}
+              onSearch={handleSearch}
+              searching={searching}
               disabled={busy}
             />
           </CardContent>
@@ -273,6 +298,7 @@ export default function RankTrackerPage() {
                 <CompetitorPanel
                   detail={report.competitorDetail}
                   loading={competitorLoading}
+                  yourPosition={report.yourPosition}
                 />
               </FeaturePanel>
             </div>
