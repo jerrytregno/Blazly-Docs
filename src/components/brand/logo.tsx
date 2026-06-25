@@ -66,7 +66,7 @@ export function BrandLogo({
                 theme === "dark" ? "text-white/90" : "text-slate-500"
               )}
             >
-              Local SEO Platform
+              Local SEO
             </span>
           </p>
         )}
