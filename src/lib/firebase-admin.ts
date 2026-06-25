@@ -59,6 +59,7 @@ function getAdminApp(): App | null {
 
     cachedApp = initializeApp({
       credential: cert(serviceAccount),
+      projectId: serviceAccount.project_id,
     });
     return cachedApp;
   } catch (error) {
@@ -99,35 +100,80 @@ export function getAdminDb(): Firestore | null {
   return getFirestore(app);
 }
 
-/** Verifies a Firebase ID token and returns the user's uid + email, or null. */
+/** Verifies a Firebase ID token and returns the user's uid + email, or an error code. */
 export async function verifyIdToken(
   idToken: string
-): Promise<{ uid: string; email: string | null } | null> {
+): Promise<
+  | { ok: true; uid: string; email: string | null }
+  | { ok: false; code: string; message: string }
+> {
   const app = getAdminApp();
-  if (!app) return null;
+  if (!app) {
+    return { ok: false, code: "admin-not-configured", message: "Firebase Admin is not configured." };
+  }
 
   try {
     const { getAuth } = getAuthModule();
     const decoded = await getAuth(app).verifyIdToken(idToken);
-    return { uid: decoded.uid, email: decoded.email ?? null };
+    return { ok: true, uid: decoded.uid, email: decoded.email ?? null };
   } catch (error) {
     const code =
       typeof error === "object" && error !== null && "code" in error
         ? String((error as { code?: string }).code)
         : "unknown";
+    const message = error instanceof Error ? error.message : "Token verification failed";
     console.error("Firebase ID token verification failed:", code, error);
+    return { ok: false, code, message };
+  }
+}
+
+function decodeJwtPayload(token: string): { aud?: string; iss?: string; exp?: number } | null {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const json = Buffer.from(normalized, "base64").toString("utf8");
+    return JSON.parse(json) as { aud?: string; iss?: string; exp?: number };
+  } catch {
     return null;
   }
 }
 
 /** Returns a user-facing hint when token verification fails on the server. */
-export function authVerificationHint(): string {
+export function authVerificationHint(
+  verifyError?: { code: string; message: string },
+  tokenAud?: string | null
+): string {
   const clientProject = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID?.trim();
   const adminProject = getAdminProjectId();
+
+  if (tokenAud && adminProject && tokenAud !== adminProject) {
+    return `Your login token is for Firebase project "${tokenAud}" but the server expects "${adminProject}". Sign out, hard-refresh the page (Cmd+Shift+R), sign in again, then retry checkout.`;
+  }
+
   if (clientProject && adminProject && clientProject !== adminProject) {
     return `Firebase project mismatch: client uses "${clientProject}" but server uses "${adminProject}". Align NEXT_PUBLIC_FIREBASE_* and FIREBASE_SERVICE_ACCOUNT_KEY on Vercel, then redeploy.`;
   }
-  return "Sign out, sign back in, and try again. If it persists, redeploy after verifying Firebase env vars on Vercel.";
+
+  if (verifyError?.code === "auth/id-token-expired") {
+    return "Your session expired. Sign out, sign back in, and try again.";
+  }
+
+  if (verifyError?.code === "auth/argument-error") {
+    return "The login token sent to checkout was malformed. Sign out, hard-refresh, and sign in again.";
+  }
+
+  if (verifyError) {
+    return `${verifyError.code}: ${verifyError.message}`;
+  }
+
+  return "Sign out, hard-refresh the page, sign back in, and try again.";
+}
+
+export function getTokenAudience(idToken: string): string | null {
+  const payload = decodeJwtPayload(idToken);
+  if (!payload?.aud) return null;
+  return typeof payload.aud === "string" ? payload.aud : String(payload.aud);
 }
 
 export async function revokeUserRefreshTokens(idToken: string): Promise<boolean> {

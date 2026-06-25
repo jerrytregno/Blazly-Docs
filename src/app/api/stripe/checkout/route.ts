@@ -7,7 +7,7 @@ import {
   isMissingStripeCustomerError,
   stripeErrorMessage,
 } from "@/lib/stripe";
-import { verifyIdToken, getAdminDb, isFirebaseAdminConfigured, authVerificationHint } from "@/lib/firebase-admin";
+import { verifyIdToken, getAdminDb, isFirebaseAdminConfigured, authVerificationHint, getTokenAudience, getAdminProjectId } from "@/lib/firebase-admin";
 import { logStripeCheckoutError } from "@/lib/stripe/logs";
 
 export const runtime = "nodejs";
@@ -57,16 +57,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const decoded = await verifyIdToken(idToken.trim());
-    if (!decoded) {
+    const verified = await verifyIdToken(idToken.trim());
+    if (!verified.ok) {
+      const tokenAud = getTokenAudience(idToken.trim());
       return NextResponse.json(
-        { error: `Invalid or expired session. ${authVerificationHint()}` },
+        {
+          error: `Invalid or expired session. ${authVerificationHint(verified, tokenAud)}`,
+          code: verified.code,
+          tokenAud,
+          adminProjectId: getAdminProjectId(),
+        },
         { status: 401 }
       );
     }
 
-    uid = decoded.uid;
-    const email = decoded.email;
+    uid = verified.uid;
+    const email = verified.email;
 
     const db = getAdminDb();
     if (db) {
