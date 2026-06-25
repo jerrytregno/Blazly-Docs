@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Building2, ChevronDown, LogOut, User } from "lucide-react";
+import { Building2, ChevronDown, Lock, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navigation } from "@/config/navigation";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -83,7 +83,10 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{section.label}</span>
+                  <span className="flex-1 truncate text-left">{section.label}</span>
+                  {!section.free && (
+                    <Lock className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+                  )}
                 </button>
               );
             }
@@ -99,7 +102,10 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                 )}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                <span className="truncate">{section.label}</span>
+                <span className="flex-1 truncate">{section.label}</span>
+                {!section.free && (
+                  <Lock className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+                )}
               </Link>
             );
           }

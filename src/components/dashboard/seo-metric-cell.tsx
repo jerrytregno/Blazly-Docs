@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
-import { Info, TrendingDown, TrendingUp } from "lucide-react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { ChevronDown, Info, TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sparkline } from "@/components/dashboard/sparkline";
 
@@ -102,6 +102,7 @@ export function SeoMetricCell({
   showAuthorityGauge,
   description,
   className,
+  expandAction,
 }: {
   label: string;
   value: string | number;
@@ -116,7 +117,12 @@ export function SeoMetricCell({
   showAuthorityGauge?: boolean;
   description?: string;
   className?: string;
+  expandAction?: {
+    buttonLabel: string;
+    panel: ReactNode;
+  };
 }) {
+  const [expanded, setExpanded] = useState(false);
   const trendUp = trend !== undefined && trend > 0;
   const trendDown = trend !== undefined && trend < 0;
   const hasChart = sparkData && sparkData.length > 1;
@@ -188,6 +194,23 @@ export function SeoMetricCell({
               </span>
             </span>
           )}
+        </div>
+      )}
+
+      {expandAction && (
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => !prev)}
+            className="inline-flex items-center gap-1 rounded-lg bg-slate-900 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+            aria-expanded={expanded}
+          >
+            {expandAction.buttonLabel}
+            <ChevronDown
+              className={cn("h-3.5 w-3.5 transition-transform", expanded && "rotate-180")}
+            />
+          </button>
+          {expanded && <div className="mt-2">{expandAction.panel}</div>}
         </div>
       )}
     </div>

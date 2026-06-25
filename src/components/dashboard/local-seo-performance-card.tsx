@@ -25,7 +25,9 @@ export function LocalSeoPerformanceCard({
 }) {
   const m = dashboard.metrics;
   const keywords = rankings?.keywords ?? [];
-  const rankedKeywords = keywords.filter((k) => k.rank > 0);
+  const rankedKeywords = keywords
+    .filter((k) => k.rank > 0)
+    .sort((a, b) => a.rank - b.rank);
   const organicKeywordCount = rankedKeywords.length;
   const citation = rankings?.citationHealth;
   const listedDirectories =
@@ -119,6 +121,30 @@ export function LocalSeoPerformanceCard({
             sparkVariant="line"
             sparkPositive={keywordTrend === undefined || keywordTrend >= 0}
             className="border-b border-gray-200 lg:border-r-0"
+            expandAction={{
+              buttonLabel: "View ranking keywords",
+              panel:
+                rankedKeywords.length > 0 ? (
+                  <ul className="max-h-44 space-y-1.5 overflow-y-auto rounded-lg border border-gray-200 bg-slate-50 p-2.5 text-xs">
+                    {rankedKeywords.map((kw) => (
+                      <li
+                        key={kw.keyword}
+                        className="flex items-center justify-between gap-3 rounded-md bg-white px-2.5 py-1.5"
+                      >
+                        <span className="min-w-0 truncate font-medium text-slate-800">
+                          {kw.keyword}
+                        </span>
+                        <span className="shrink-0 font-semibold text-indigo-600">#{kw.rank}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="rounded-lg border border-gray-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                    No ranking keywords yet. Run analysis to discover what your business ranks for
+                    on Google.
+                  </p>
+                ),
+            }}
           />
           <SeoMetricCell
             label="Maps Visibility"
