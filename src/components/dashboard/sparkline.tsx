@@ -58,9 +58,9 @@ export function Sparkline({
   const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
   const areaPath = `${linePath} L ${points[points.length - 1].x} ${height - 2} L ${points[0].x} ${height - 2} Z`;
 
-  const stroke = positive === false ? "#ef4444" : "#4b7bec";
+  const stroke = positive === false ? "#ef4444" : "#6366f1";
   const fill =
-    positive === false ? "rgba(239,68,68,0.15)" : "rgba(75,123,236,0.18)";
+    positive === false ? "rgba(239,68,68,0.15)" : "rgba(99,102,241,0.18)";
 
   return (
     <svg
