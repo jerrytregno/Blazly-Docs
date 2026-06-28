@@ -21,7 +21,6 @@ import {
   openHoursToWeekly,
   imageCountFromListing,
   fetchRealReviews,
-  trackKeywords,
   buildRealGeoGrid,
   buildKeywordGroups,
   buildActivityFeed,
@@ -29,6 +28,13 @@ import {
   buildStrategistRecommendations,
 } from "./real-data";
 import { computeVisibilityMetrics, keywordRankingProgress } from "./visibility-metrics";
+import {
+  buildOrganicMetricsInput,
+  fetchOrganicPerformanceMetrics,
+} from "./organic-metrics";
+import { buildProfileOptimizationFromListing } from "./profile-optimization";
+import { buildRankTrackerSeed } from "@/lib/keyword-research/build-from-analysis";
+import { enrichCitationListingUrls } from "./citation-catalog";
 import { regionGl } from "./search-regions";
 import { analyzeCompetition } from "./competition-analysis";
 import { fetchMapsCategoryRank } from "./maps-rank";
@@ -173,6 +179,7 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
 
   let mapsRank = 0;
   let mapsRankQuery = "";
+  let mapsRankResults: LocalBusiness[] = [];
   if (listing?.place_id && competitionLocation) {
     const rankResult = await fetchMapsCategoryRank({
       category: competitionCategory,
@@ -186,6 +193,7 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
     });
     mapsRank = rankResult.rank;
     mapsRankQuery = rankResult.query;
+    mapsRankResults = rankResult.results;
     if (mapsRank > 0) {
       listing = { ...listing, position: mapsRank };
     }
@@ -232,7 +240,19 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
     mapsRank: mapsRank > 0 ? mapsRank : undefined,
     mapsRankQuery: mapsRankQuery || undefined,
   });
-  const citationListings = buildCitationListings(listing, scores.citationHealth);
+  const citationListings = enrichCitationListingUrls(
+    buildCitationListings(listing, scores.citationHealth),
+    {
+      businessName: business.name,
+      mapsPlaceId: business.mapsPlaceId ?? listing?.place_id,
+      address: business.address,
+      city: business.city,
+      state: business.state,
+      zip: business.zip,
+      phone: business.phone,
+      website: business.website,
+    }
+  );
   const competitorNames = competitors.filter((c) => !c.isYou).map((c) => c.name);
   const gbpAuditChecklist = buildGbpAuditChecklist(listing);
   const citationGaps = competitorCitationGaps(citationListings, competitorNames);
@@ -249,21 +269,25 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
   const keywordQuery = category || business.primaryCategory || input.businessName;
   const geoKeyword = keywordQuery;
 
-  const [reviewData, keywords, geoGrid, geminiAudit] = await Promise.all([
+  const [reviewData, organicMetrics, geoGrid, geminiAudit] = await Promise.all([
     listing?.place_id
       ? fetchRealReviews(listing.place_id, gl).catch(() => null)
       : Promise.resolve(null),
-    location
-      ? trackKeywords(
-          input.businessName,
-          keywordQuery,
-          location,
-          listing?.place_id,
-          ll,
-          gl,
-          input.website
-        ).catch(() => [] as RankingsDoc["keywords"])
-      : Promise.resolve([] as RankingsDoc["keywords"]),
+    fetchOrganicPerformanceMetrics(
+      buildOrganicMetricsInput({
+        businessName: input.businessName,
+        category: keywordQuery,
+        location: location || business.city || "",
+        listing,
+        mapsRank: mapsRank > 0 ? mapsRank : listing?.position,
+        visibilityScore: scores.localVisibility,
+        gbpHealth: scores.gbpHealth,
+      })
+    ).catch(() => ({
+      authorityScore: scores.overallScore,
+      organicTraffic: Math.max(100, (listing?.reviews ?? 10) * 12),
+      keywords: [] as RankingsDoc["keywords"],
+    })),
     listing?.gps_coordinates
       ? buildRealGeoGrid(listing, geoKeyword, input.businessName, gl).catch(() => null)
       : Promise.resolve(null),
@@ -275,6 +299,21 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
       competitors: results.filter((r) => r.place_id !== listing?.place_id),
     }).catch(() => null),
   ]);
+
+  const keywords =
+    organicMetrics.keywords.length > 0
+      ? organicMetrics.keywords
+      : await import("./real-data").then((m) =>
+          m.trackKeywords(
+            input.businessName,
+            keywordQuery,
+            location || business.city || "",
+            listing?.place_id,
+            ll,
+            gl,
+            input.website
+          )
+        ).catch(() => [] as RankingsDoc["keywords"]);
 
   const aiRecommendations = [
     ...(geminiAudit?.recommendations ?? []),
@@ -358,12 +397,13 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
     visibilityScore: resolvedLocalVisibility,
     listingSyncStatus: napListingSyncStatus(listing, napAudit),
     metrics: {
-      overallScore: scores.overallScore,
+      overallScore: Math.max(scores.overallScore, organicMetrics.authorityScore),
       aiVisibility:
         visibility?.aiVisibility ??
         scores.localVisibility,
       organicTraffic:
         visibility?.organicTraffic ??
+        organicMetrics.organicTraffic ??
         Math.max(1, Math.round((scores.localVisibility / 100) * (listing?.reviews ?? 10))),
       localVisibility: resolvedLocalVisibility,
       gbpHealth: scores.gbpHealth,
@@ -398,7 +438,19 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
     searchRegion: input.searchRegion,
   };
 
+  const rankTrackerSeed =
+    mapsRankResults.length > 0 && competitionLocation
+      ? buildRankTrackerSeed({
+          category: competitionCategory,
+          location: competitionLocation,
+          businessName: input.businessName,
+          placeId: listing?.place_id,
+          mapsResults: mapsRankResults,
+        })
+      : undefined;
+
   const rankings: Partial<RankingsDoc> = {
+    rankTrackerSeed,
     competitors,
     competitionAnalysis,
     keywords,
@@ -522,6 +574,13 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
     ],
   };
 
+  const profileOptimization = listing
+    ? buildProfileOptimizationFromListing(listing, {
+        mapsLink: business.mapsPlaceId ?? listing.place_id,
+        websiteUrl: business.website,
+      })
+    : undefined;
+
   return {
     listing,
     business: {
@@ -532,6 +591,7 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
     dashboard,
     rankings,
     reviews,
+    profileOptimization,
     scores,
   };
 }

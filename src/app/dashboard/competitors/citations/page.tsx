@@ -27,8 +27,8 @@ export default function CitationsPage() {
                   Other Directories: {c?.otherDirectories.listed ?? 0}/{c?.otherDirectories.total ?? 0}
                 </p>
               </div>
-              <Link href="/dashboard/competitors/citation-finder" className="text-sm text-indigo-600 hover:text-indigo-700">
-                Open Citation Finder →
+              <Link href="/dashboard/franchise-tracking" className="text-sm text-indigo-600 hover:text-indigo-700">
+                Open Franchise Tracking →
               </Link>
             </div>
           </CardContent>

@@ -1,6 +1,7 @@
 import type {
   BusinessDoc,
   DashboardDoc,
+  ProfileOptimizationDoc,
   RankingsDoc,
   ReviewItem,
   ReviewsDoc,
@@ -17,6 +18,7 @@ export interface AnalyzeResponse {
   dashboard: Partial<DashboardDoc>;
   rankings: Partial<RankingsDoc>;
   reviews: Partial<ReviewsDoc>;
+  profileOptimization?: Partial<ProfileOptimizationDoc>;
   foundListing: boolean;
 }
 

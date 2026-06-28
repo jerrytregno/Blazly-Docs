@@ -10,9 +10,11 @@ import {
   Radar,
   BarChart3,
   TrendingUp,
+  Building2,
 } from "lucide-react";
 import { useUpgradeModal } from "@/components/billing/upgrade-modal-provider";
 import { usePlan } from "@/components/providers/plan-provider";
+import { useFranchiseListings } from "@/hooks/use-franchise-listings";
 import type { DashboardDoc, ProfileOptimizationDoc, RankingsDoc, ReviewsDoc } from "@/types/firestore";
 
 interface ToolItem {
@@ -39,6 +41,7 @@ export function FeatureHighlightsRow({
 }) {
   const { isPro } = usePlan();
   const { openUpgradeModal } = useUpgradeModal();
+  const { liveCount } = useFranchiseListings();
   const pendingReplies = reviews?.inbox.filter((r) => !r.replied).length ?? 0;
   const competition = rankings?.competitionAnalysis;
   const profileScore = profileOptimization?.scores.profileCompleteness;
@@ -64,6 +67,16 @@ export function FeatureHighlightsRow({
       detail: competition
         ? `${competition.category} · ${competition.location} · ${competition.competitorCount} competitors`
         : undefined,
+    },
+    {
+      title: "Franchise Tracking",
+      description:
+        "See how many directories list your business profile and open each live listing or submit missing ones.",
+      href: "/dashboard/franchise-tracking",
+      icon: Building2,
+      requiresPro: true,
+      metric: liveCount > 0 ? String(liveCount) : undefined,
+      metricLabel: "live listings",
     },
     {
       title: "Rank Tracker",

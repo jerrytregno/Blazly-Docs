@@ -52,6 +52,11 @@ export function buildCitationListings(
       authority: dir.authority,
       value: dir.value,
       submitable: dir.submitable,
+      profileName: isGoogle && googleLive ? listing?.title : undefined,
+      url:
+        isGoogle && googleLive && listing?.place_id
+          ? `https://www.google.com/maps/place/?q=place_id:${listing.place_id}`
+          : undefined,
     };
   });
 }
@@ -143,4 +148,134 @@ export function competitorCitationGaps(
   if (!missing.length) return [];
   const leader = competitorNames[0] ?? "Top competitors";
   return missing.slice(0, 5).map((dir) => `${leader} is likely listed on ${dir} — you're not yet.`);
+}
+
+function encodeQuery(value: string): string {
+  return encodeURIComponent(value.trim());
+}
+
+export function buildDirectoryProfileUrl(
+  directory: string,
+  input: {
+    businessName: string;
+    mapsPlaceId?: string;
+    address?: string;
+    city?: string;
+    phone?: string;
+    website?: string;
+  }
+): string | undefined {
+  const name = input.businessName.trim();
+  const location = [input.city, input.address].filter(Boolean).join(" ").trim();
+
+  switch (directory) {
+    case "Google Business Profile":
+      return input.mapsPlaceId
+        ? `https://www.google.com/maps/place/?q=place_id:${input.mapsPlaceId}`
+        : `https://www.google.com/maps/search/?api=1&query=${encodeQuery(name + " " + location)}`;
+    case "Yelp":
+      return `https://www.yelp.com/search?find_desc=${encodeQuery(name)}&find_loc=${encodeQuery(location || input.city || "")}`;
+    case "Facebook":
+      return `https://www.facebook.com/search/pages?q=${encodeQuery(name)}`;
+    case "Apple Maps":
+      return `https://maps.apple.com/?q=${encodeQuery(name + " " + location)}`;
+    case "Bing Places":
+      return `https://www.bing.com/maps?q=${encodeQuery(name + " " + location)}`;
+    case "TripAdvisor":
+      return `https://www.tripadvisor.com/Search?q=${encodeQuery(name + " " + location)}`;
+    case "Yellow Pages":
+      return `https://www.yellowpages.com/search?search_terms=${encodeQuery(name)}&geo_location_terms=${encodeQuery(location)}`;
+    case "BBB":
+      return `https://www.bbb.org/search?find_text=${encodeQuery(name)}&find_loc=${encodeQuery(location)}`;
+    case "Angi":
+      return `https://www.angi.com/companylist/${encodeQuery(location)}/${encodeQuery(name)}.htm`;
+    case "Nextdoor":
+      return `https://nextdoor.com/search/?query=${encodeQuery(name)}`;
+    case "Foursquare":
+      return `https://foursquare.com/explore?q=${encodeQuery(name)}&near=${encodeQuery(location)}`;
+    case "MapQuest":
+      return `https://www.mapquest.com/search/results?query=${encodeQuery(name + " " + location)}`;
+    default:
+      return input.website || undefined;
+  }
+}
+
+export function buildDirectorySubmitUrl(directory: string): string | undefined {
+  switch (directory) {
+    case "Google Business Profile":
+      return "https://www.google.com/business/";
+    case "Apple Maps":
+      return "https://register.apple.com/placesonmaps/";
+    case "Bing Places":
+      return "https://www.bingplaces.com/";
+    case "Facebook":
+      return "https://www.facebook.com/pages/create/";
+    case "Yelp":
+      return "https://biz.yelp.com/signup_business/new";
+    case "Yellow Pages":
+      return "https://www.yellowpages.com/add-business";
+    case "Foursquare":
+      return "https://foursquare.com/claim";
+    case "TripAdvisor":
+      return "https://www.tripadvisorsupport.com/hc/en-us/articles/200613837";
+    case "BBB":
+      return "https://www.bbb.org/get-listed";
+    case "Angi":
+      return "https://www.angi.com/companylist/claim";
+    case "Nextdoor":
+      return "https://business.nextdoor.com/";
+  }
+  return undefined;
+}
+
+export function enrichCitationListingUrls(
+  listings: CitationListing[],
+  input: {
+    businessName?: string;
+    mapsPlaceId?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    phone?: string;
+    website?: string;
+  }
+): CitationListing[] {
+  const businessName = input.businessName?.trim() || "Business";
+
+  return listings.map((listing) => {
+    const url =
+      listing.url ??
+      buildDirectoryProfileUrl(listing.directory, {
+        businessName,
+        mapsPlaceId: input.mapsPlaceId,
+        address: input.address,
+        city: input.city,
+        phone: input.phone,
+        website: input.website,
+      });
+
+    const submitUrl =
+      listing.submitUrl ??
+      (listing.status === "missing" || listing.status === "dead"
+        ? buildDirectorySubmitUrl(listing.directory)
+        : undefined);
+
+    return {
+      ...listing,
+      profileName: listing.profileName ?? businessName,
+      url,
+      submitUrl,
+    };
+  });
+}
+
+export function summarizeFranchiseListings(listings: CitationListing[]) {
+  const live = listings.filter((l) => l.status === "live").length;
+  const missing = listings.filter((l) => l.status === "missing").length;
+  const inactive = listings.filter((l) => l.status === "dead" || l.status === "duplicate").length;
+  const total = listings.length || 1;
+  const score = Math.round((live / total) * 100);
+
+  return { live, missing, inactive, score, total };
 }

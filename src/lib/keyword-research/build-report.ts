@@ -1,6 +1,7 @@
 import type {
   BusinessDoc,
   KeywordResearchReport,
+  RankTrackerSeed,
 } from "@/types/firestore";
 import { fetchGoogleMapsPlace } from "@/lib/searchapi";
 import { parseGoogleMapsPlaceId } from "@/lib/seo/maps-place";
@@ -8,6 +9,10 @@ import { resolveSearchLocation } from "@/lib/seo/analysis-location";
 import { fetchTopLocalRankings } from "./fetch-rankings";
 import { buildVisibilityScores } from "./build-scores";
 import { fetchCompetitorDeepDive } from "./competitor-detail";
+import {
+  buildRankTrackerReportFromAnalysis,
+  rankTrackerSeedMatchesSearch,
+} from "./build-from-analysis";
 import {
   generateKeywordOpportunities,
   generateRankingStrategy,
@@ -21,7 +26,60 @@ export async function buildKeywordResearchReport(input: {
   competitorPlaceId?: string;
   includeStrategy?: boolean;
   profileCompleteness?: number;
+  rankTrackerSeed?: RankTrackerSeed | null;
+  preferAnalysisCache?: boolean;
 }): Promise<KeywordResearchReport> {
+  if (
+    input.preferAnalysisCache &&
+    rankTrackerSeedMatchesSearch(input.rankTrackerSeed, input.category, input.location)
+  ) {
+    const placeId = parseGoogleMapsPlaceId(input.business.mapsPlaceId ?? "");
+    let userListing = null;
+    if (placeId) {
+      try {
+        const place = await fetchGoogleMapsPlace(placeId);
+        userListing = place.place_result ?? place.local_results?.[0] ?? null;
+      } catch {
+        userListing = null;
+      }
+    }
+
+    const cachedReport = await buildRankTrackerReportFromAnalysis({
+      seed: input.rankTrackerSeed!,
+      profileCompleteness: input.profileCompleteness,
+      userListing,
+    });
+
+    if (input.includeStrategy) {
+      cachedReport.strategy = await generateRankingStrategy({
+        businessName: input.business.name,
+        category: input.category,
+        location: input.location,
+        yourPosition: cachedReport.yourPosition,
+        listings: cachedReport.listings,
+        competitorDetail: undefined,
+        scores: cachedReport.scores,
+      });
+    }
+
+    if (input.competitorPlaceId) {
+      const competitorTarget = cachedReport.listings.find(
+        (l) => l.placeId === input.competitorPlaceId
+      );
+      const you = cachedReport.listings.find((l) => l.isYou);
+      if (competitorTarget && !competitorTarget.isYou && you) {
+        cachedReport.competitorDetail = await fetchCompetitorDeepDive({
+          competitor: competitorTarget,
+          user: you,
+          userListing,
+          userPlaceId: placeId ?? undefined,
+          yourPosition: cachedReport.yourPosition,
+        });
+      }
+    }
+
+    return cachedReport;
+  }
   const placeId = parseGoogleMapsPlaceId(input.business.mapsPlaceId ?? "");
   let userListing = null;
   let lat: number | undefined;

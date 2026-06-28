@@ -70,7 +70,7 @@ export function LocalSeoPerformanceCard({
   return (
     <Card className="overflow-hidden border-slate-200/80 shadow-lg shadow-indigo-100/30 ring-1 ring-slate-200/60">
       <div className="h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500" />
-      <SeoCardHeader scope={scope} analyzedAt={dashboard.lastAnalyzedAt} />
+      <SeoCardHeader scope={scope} analyzedAt={dashboard.lastAnalyzedAt ?? undefined} />
       <CardContent className="grid grid-cols-1 gap-px bg-slate-100 p-0 md:grid-cols-2 lg:grid-cols-6">
         <SeoMetricCell
           className="lg:col-span-2"

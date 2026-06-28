@@ -19,9 +19,9 @@ type RangeKey = "7" | "14" | "30";
 type MetricKey = "websiteTraffic" | "gbpViews" | "engagement";
 
 const METRIC_LABELS: Record<MetricKey, string> = {
-  websiteTraffic: "Website Traffic",
+  websiteTraffic: "Maps Website Clicks",
   gbpViews: "GBP Views",
-  engagement: "Engagement",
+  engagement: "Maps Engagement",
 };
 
 const SUMMARY_UNIT: Record<MetricKey, string> = {

@@ -7,6 +7,7 @@ import {
   BarChart3,
   CreditCard,
   TrendingUp,
+  Building2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -81,6 +82,13 @@ export const navigation: NavSection[] = [
 
     free: true,
 
+  },
+
+  {
+    id: "franchise-tracking",
+    label: "Franchise Tracking",
+    icon: Building2,
+    href: "/dashboard/franchise-tracking",
   },
 
   {

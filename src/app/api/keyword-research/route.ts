@@ -4,6 +4,7 @@ import {
   getDashboard,
   getKeywordResearch,
   getProfileOptimization,
+  getRankings,
   updateKeywordResearch,
 } from "@/lib/firestore/collections";
 import { buildKeywordResearchReport } from "@/lib/keyword-research/build-report";
@@ -62,10 +63,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const [business, dashboard, profileOptimization] = await Promise.all([
+    const [business, dashboard, profileOptimization, rankings] = await Promise.all([
       getBusiness(uid),
       getDashboard(uid),
       getProfileOptimization(uid),
+      getRankings(uid),
     ]);
 
     const searchCategory = category?.trim() || business.primaryCategory || "Local business";
@@ -88,6 +90,8 @@ export async function POST(request: NextRequest) {
       competitorPlaceId,
       includeStrategy: Boolean(includeStrategy),
       profileCompleteness: profileOptimization.scores?.profileCompleteness,
+      rankTrackerSeed: rankings.rankTrackerSeed,
+      preferAnalysisCache: !isCompetitorOnly,
     });
 
     const payload = {

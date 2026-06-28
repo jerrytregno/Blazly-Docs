@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
       dashboard: result.dashboard,
       rankings: result.rankings,
       reviews: result.reviews,
+      profileOptimization: result.profileOptimization,
       foundListing: Boolean(result.listing),
     });
   } catch (error) {

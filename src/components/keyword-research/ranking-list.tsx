@@ -74,7 +74,7 @@ export function RankingList({
         )}
       >
         <CardContent className="p-4">
-          <p className="text-sm font-medium">Your business position</p>
+          <p className="text-sm font-medium">Google Maps rank</p>
           <p className="mt-1 text-2xl font-bold">
             {yourPosition ? `#${yourPosition}` : "Not in top 10"}
           </p>

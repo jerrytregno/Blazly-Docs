@@ -344,6 +344,25 @@ export function computeProfileScores(
   };
 }
 
+export function buildProfileOptimizationFromListing(
+  listing: LocalBusiness,
+  input?: { mapsLink?: string; websiteUrl?: string }
+) {
+  const snapshot = buildProfileSnapshot(listing);
+  const fieldAudit = buildFieldAudit(listing, snapshot);
+  const scores = computeProfileScores(listing, snapshot, fieldAudit);
+
+  return {
+    websiteUrl: input?.websiteUrl ?? listing.website ?? "",
+    mapsLink: input?.mapsLink ?? (listing.place_id ? `place_id:${listing.place_id}` : ""),
+    snapshot,
+    fieldAudit,
+    scores,
+    analyzedAt: new Date().toISOString(),
+    error: null,
+  };
+}
+
 export async function runProfileAnalysis(input: {
   websiteUrl?: string;
   mapsLink?: string;
