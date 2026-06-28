@@ -1,7 +1,6 @@
 import type { LocalBusiness } from "@/types";
 import { buildGbpAuditChecklist } from "./citation-catalog";
 import { buildNapAudit } from "./nap-audit";
-import { imageCountFromListing } from "./real-data";
 
 function clamp(n: number, min = 0, max = 100) {
   return Math.round(Math.max(min, Math.min(max, n)));
@@ -9,13 +8,12 @@ function clamp(n: number, min = 0, max = 100) {
 
 /** Authority / Local SEO score weights (must sum to 1.0) */
 export const LOCAL_SEO_WEIGHTS = {
-  gbpCompleteness: 0.25,
-  napConsistency: 0.15,
-  reviews: 0.2,
-  onPageLocalSeo: 0.15,
-  citationsBacklinks: 0.1,
-  proximityCategoryMatch: 0.05,
-  engagementSignals: 0.1,
+  gbpCompleteness: 0.278,
+  napConsistency: 0.167,
+  reviews: 0.222,
+  onPageLocalSeo: 0.167,
+  citationsBacklinks: 0.111,
+  proximityCategoryMatch: 0.056,
 } as const;
 
 export interface LocalSeoFactorScore {
@@ -33,38 +31,33 @@ const FACTOR_META: Record<
 > = {
   gbpCompleteness: {
     label: "Google Business Profile (GBP) Completeness",
-    weight: "25%",
+    weight: "28%",
     why: "Single biggest controllable factor",
   },
   napConsistency: {
     label: "NAP Consistency (Name, Address, Phone)",
-    weight: "15%",
+    weight: "17%",
     why: "Trust signal across the web",
   },
   reviews: {
     label: "Reviews (volume, rating, recency, responses)",
-    weight: "20%",
+    weight: "22%",
     why: "Heavily correlated with rankings",
   },
   onPageLocalSeo: {
     label: "On-Page Local SEO",
-    weight: "15%",
+    weight: "17%",
     why: "Site-level relevance signals",
   },
   citationsBacklinks: {
     label: "Citations & Backlinks (local directories)",
-    weight: "10%",
+    weight: "11%",
     why: "Directory presence and local link equity",
   },
   proximityCategoryMatch: {
     label: "Proximity / Categories Match",
-    weight: "5%",
+    weight: "6%",
     why: "Hard to control, but trackable",
-  },
-  engagementSignals: {
-    label: "Engagement Signals (clicks, calls, photo views)",
-    weight: "10%",
-    why: "Behavioral relevance",
   },
 };
 
@@ -75,7 +68,6 @@ const FACTOR_ORDER: Array<keyof typeof LOCAL_SEO_WEIGHTS> = [
   "onPageLocalSeo",
   "citationsBacklinks",
   "proximityCategoryMatch",
-  "engagementSignals",
 ];
 
 function scoreGbpCompleteness(listing: LocalBusiness | null): number {
@@ -174,22 +166,6 @@ function scoreCitationsBacklinks(
   return clamp(score);
 }
 
-function scoreEngagementSignals(listing: LocalBusiness | null): number {
-  if (!listing) return 0;
-  const photos = imageCountFromListing(listing);
-  const photoScore =
-    photos >= 10 ? 100 : photos >= 5 ? 80 : photos >= 1 ? 50 : 0;
-  const phoneScore = listing.phone ? 100 : 0;
-  const hoursScore =
-    listing.open_hours && Object.keys(listing.open_hours).length >= 5
-      ? 100
-      : listing.hours || listing.open_state
-        ? 70
-        : 0;
-
-  return clamp(photoScore * 0.45 + phoneScore * 0.3 + hoursScore * 0.25);
-}
-
 function scoreProximityCategoryMatch(listing: LocalBusiness | null): number {
   if (!listing) return 0;
   const gpsScore = listing.gps_coordinates ? 100 : 40;
@@ -234,7 +210,6 @@ export function calculateLocalSeoScore(input: {
       input.citationScore
     ),
     proximityCategoryMatch: scoreProximityCategoryMatch(input.listing),
-    engagementSignals: scoreEngagementSignals(input.listing),
   };
 
   const factors: LocalSeoFactorScore[] = FACTOR_ORDER.map((key) => {

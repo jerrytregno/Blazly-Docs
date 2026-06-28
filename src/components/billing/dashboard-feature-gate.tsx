@@ -20,9 +20,9 @@ function featureLabelForPath(pathname: string): string {
 export function DashboardFeatureGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { isPro, loading } = usePlan();
+  const { hasPaidAccess, loading } = usePlan();
   const { openUpgradeModal } = useUpgradeModal();
-  const blocked = !loading && !isPro && !isFreeDashboardRoute(pathname);
+  const blocked = !loading && !hasPaidAccess && !isFreeDashboardRoute(pathname);
 
   useEffect(() => {
     if (!blocked) return;

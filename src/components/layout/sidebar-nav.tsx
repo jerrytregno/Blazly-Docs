@@ -27,7 +27,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const { logout } = useAuth();
-  const { isPro } = usePlan();
+  const { hasPaidAccess } = usePlan();
   const { openUpgradeModal } = useUpgradeModal();
   const [loggingOut, setLoggingOut] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
@@ -80,7 +80,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           const sectionActive = isSectionActive(pathname, section);
 
           if (isDirectLink) {
-            const needsUpgrade = !section.free && !isPro;
+            const needsUpgrade = !section.free && !hasPaidAccess;
 
             if (needsUpgrade) {
               return (
@@ -117,7 +117,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
               >
                 <Icon className="h-4 w-4 shrink-0" />
                 <span className="flex-1 truncate">{section.label}</span>
-                {!section.free && !isPro && (
+                {!section.free && !hasPaidAccess && (
                   <Lock className="ml-auto h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
                 )}
               </Link>

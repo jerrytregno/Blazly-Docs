@@ -33,21 +33,9 @@ export async function buildKeywordResearchReport(input: {
     input.preferAnalysisCache &&
     rankTrackerSeedMatchesSearch(input.rankTrackerSeed, input.category, input.location)
   ) {
-    const placeId = parseGoogleMapsPlaceId(input.business.mapsPlaceId ?? "");
-    let userListing = null;
-    if (placeId) {
-      try {
-        const place = await fetchGoogleMapsPlace(placeId);
-        userListing = place.place_result ?? place.local_results?.[0] ?? null;
-      } catch {
-        userListing = null;
-      }
-    }
-
-    const cachedReport = await buildRankTrackerReportFromAnalysis({
+    const cachedReport = buildRankTrackerReportFromAnalysis({
       seed: input.rankTrackerSeed!,
       profileCompleteness: input.profileCompleteness,
-      userListing,
     });
 
     if (input.includeStrategy) {
@@ -60,22 +48,6 @@ export async function buildKeywordResearchReport(input: {
         competitorDetail: undefined,
         scores: cachedReport.scores,
       });
-    }
-
-    if (input.competitorPlaceId) {
-      const competitorTarget = cachedReport.listings.find(
-        (l) => l.placeId === input.competitorPlaceId
-      );
-      const you = cachedReport.listings.find((l) => l.isYou);
-      if (competitorTarget && !competitorTarget.isYou && you) {
-        cachedReport.competitorDetail = await fetchCompetitorDeepDive({
-          competitor: competitorTarget,
-          user: you,
-          userListing,
-          userPlaceId: placeId ?? undefined,
-          yourPosition: cachedReport.yourPosition,
-        });
-      }
     }
 
     return cachedReport;

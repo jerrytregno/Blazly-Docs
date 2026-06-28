@@ -18,6 +18,8 @@ interface PlanContextValue {
   businessesUsed: number;
   loading: boolean;
   isPro: boolean;
+  /** True when the user has an active paid subscription (Pro + at least one business slot). */
+  hasPaidAccess: boolean;
   refreshPlan: () => Promise<void>;
 }
 
@@ -58,6 +60,7 @@ export function PlanProvider({ children }: { children: ReactNode }) {
         businessesUsed,
         loading,
         isPro: hasProAccess(plan),
+        hasPaidAccess: hasProAccess(plan) && businessSlots > 0,
         refreshPlan,
       }}
     >

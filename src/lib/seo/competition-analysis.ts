@@ -226,6 +226,18 @@ export function matchesCompetitorsBusiness(
   return norm(you.name) === norm(businessName);
 }
 
+/** True when onboarding analysis already seeded competitor data — skip duplicate scans. */
+export function hasAnalysisSeededCompetition(
+  rankings: RankingsDoc | null | undefined,
+  dashboard?: { analysisStatus?: string } | null
+): boolean {
+  return Boolean(
+    rankings?.competitors?.length &&
+      rankings?.competitionAnalysis &&
+      dashboard?.analysisStatus === "complete"
+  );
+}
+
 export function isCompetitionDataCurrent(
   rankings: RankingsDoc | null | undefined,
   businessName: string,

@@ -125,6 +125,51 @@ function signalsFromRank(rank: number): AiPlatformSignal {
   };
 }
 
+/** Build visibility metrics from onboarding data — no extra SearchAPI calls. */
+export function buildVisibilityFromAnalysis(input: {
+  listing: LocalBusiness | null;
+  businessName: string;
+  category: string;
+  location: string;
+  mapsRank?: number;
+  mapsRankQuery?: string;
+  keywords: Keyword[];
+  localVisibility: number;
+  organicTraffic: number;
+}): VisibilityMetrics {
+  const { listing, businessName, category, location, keywords, localVisibility, organicTraffic } =
+    input;
+  const mapsRank = input.mapsRank ?? listing?.position ?? 0;
+  const city = location || listing?.address?.split(",").slice(-2)[0]?.trim() || "";
+  const categoryQuery =
+    input.mapsRankQuery || [category || businessName, city].filter(Boolean).join(" ");
+  const nearMeQuery = `${category || "business"} near me`;
+  const mapsQuery = input.mapsRankQuery || category || businessName;
+
+  const brandRank = listing?.position ?? 0;
+  const categoryRank = mapsRank || keywords.find((k) => k.rank > 0)?.rank || 0;
+
+  const searchQueries = [
+    { label: "Brand", query: businessName, rank: brandRank },
+    { label: "Category", query: categoryQuery, rank: categoryRank },
+    { label: "Near me", query: nearMeQuery, rank: 0 },
+    { label: "Maps", query: mapsQuery, rank: mapsRank || brandRank },
+  ];
+
+  return {
+    aiVisibility: localVisibility,
+    organicTraffic,
+    localVisibility,
+    platformSignals: {
+      chatgpt: signalsFromRank(brandRank),
+      aiOverview: signalsFromRank(categoryRank),
+      aiMode: signalsFromRank(mapsRank || brandRank),
+      gemini: signalsFromRank(categoryRank),
+    },
+    searchQueries,
+  };
+}
+
 function keywordOrganicScore(keywords: Keyword[]): number {
   const ranked = keywords.filter((k) => k.rank > 0);
   if (!ranked.length) return 0;

@@ -4,7 +4,8 @@ import {
   fetchUnansweredReviewsBatch,
   MAX_UNANSWERED_BATCHES,
   MAX_UNANSWERED_REVIEWS,
-  UNANSWERED_BATCH_SIZE,
+  REVIEWS_API_CALLS_FULL_LOAD,
+  REVIEWS_API_CALLS_PER_BATCH,
 } from "@/lib/seo/real-data";
 import { getReviewLoadCooldownState } from "@/lib/seo/analysis-cooldown";
 import { regionGl } from "@/lib/seo/search-regions";
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
       nextPageToken: reset ? undefined : nextPageToken,
       existingIds: reset ? [] : existingReviewIds ?? [],
       targetCount,
+      maxPages: isFullLoad ? REVIEWS_API_CALLS_FULL_LOAD : REVIEWS_API_CALLS_PER_BATCH,
     });
 
     const newBatchCount = isFullLoad

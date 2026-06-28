@@ -543,7 +543,6 @@ export interface AnalyticsScores {
   trafficScore: number;
   reviewScore: number;
   reputationScore: number;
-  engagementScore: number;
   visibilityScore: number;
   overallScore: number;
 }

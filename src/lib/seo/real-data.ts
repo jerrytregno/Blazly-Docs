@@ -5,6 +5,7 @@ import type {
   KeywordGroup,
   ReviewItem,
   ReviewSentiment,
+  ReviewsDoc,
   ActivityItem,
   StrategistTask,
   StrategistRecommendation,
@@ -126,9 +127,12 @@ const MAX_PAGES_SAFETY = 500;
 export const UNANSWERED_BATCH_SIZE = 20;
 export const MAX_UNANSWERED_BATCHES = 5;
 export const MAX_UNANSWERED_REVIEWS = 100;
-const MAX_PAGES_PER_UNANSWERED_BATCH = 15;
-/** Max Google review pages to scan when loading the full 100 unanswered written reviews */
-const MAX_PAGES_FULL_LOAD = 200;
+/** SearchAPI returns up to 20 reviews per call — 5 pages = 100 reviews max. */
+export const REVIEWS_API_CALLS_FULL_LOAD = 5;
+/** One SearchAPI call per incremental load-more action. */
+export const REVIEWS_API_CALLS_PER_BATCH = 1;
+const MAX_PAGES_FULL_LOAD = REVIEWS_API_CALLS_FULL_LOAD;
+const MAX_PAGES_PER_UNANSWERED_BATCH = REVIEWS_API_CALLS_PER_BATCH;
 
 function reviewStableId(r: GoogleMapsReview, placeId: string, index: number): string {
   return r.review_id ?? `${placeId}-${index}`;
@@ -233,6 +237,55 @@ export async function fetchUnansweredReviewsBatch(
     nextPageToken: nextToken,
     isComplete: !nextToken,
   };
+}
+
+/** Map a paginated review fetch into Firestore review fields (shared by analysis + review management). */
+export function reviewsDocFromBatchFetch(
+  data: FetchGoogleReviewsResult | null,
+  options: {
+    listingReviews?: number;
+    reviewGoal?: ReviewsDoc["reviewGoal"];
+    batchesLoaded?: number;
+  } = {}
+): Partial<ReviewsDoc> {
+  if (!data) {
+    return {
+      inbox: [],
+      reviewGoal: options.reviewGoal,
+    };
+  }
+
+  return {
+    inbox: data.unanswered,
+    placeId: data.placeId,
+    fetchedAt: data.fetchedAt,
+    scannedCount: data.scannedCount,
+    totalOnGoogle: data.placeReviewCount ?? options.listingReviews,
+    answeredCount: data.answeredCount,
+    nextPageToken: data.nextPageToken,
+    unansweredBatchesLoaded: options.batchesLoaded ?? 1,
+    sentiment: data.sentiment,
+    monitoredPlatforms: [
+      {
+        name: "Google",
+        count: data.placeReviewCount ?? data.unanswered.length,
+        connected: true,
+      },
+    ],
+    reviewGoal: options.reviewGoal,
+  };
+}
+
+export function hasAnalysisSeededReviews(
+  reviews: ReviewsDoc | null | undefined,
+  placeId?: string | null
+): boolean {
+  return Boolean(
+    reviews?.fetchedAt &&
+      reviews.placeId &&
+      (!placeId || reviews.placeId === placeId) &&
+      (reviews.unansweredBatchesLoaded ?? 0) > 0
+  );
 }
 
 export async function fetchGoogleReviewsChunk(

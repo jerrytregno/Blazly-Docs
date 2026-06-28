@@ -186,6 +186,22 @@ export default function ProfileOptimizationPage() {
     const mapsKey = normalizeMapsKey(trimmed);
     if (mapsKey === lastFetchedKey.current) return;
 
+    if (
+      cachedProfile?.analyzedAt &&
+      cachedProfile.snapshot &&
+      mapsKey === normalizeMapsKey(cachedProfile.mapsLink || business?.mapsPlaceId || "")
+    ) {
+      lastFetchedKey.current = mapsKey;
+      if (!doc) {
+        setDoc({
+          ...cachedProfile,
+          userId: user.uid,
+          enhancement: cachedProfile.enhancement ?? null,
+        });
+      }
+      return;
+    }
+
     if (autoFetchTimer.current) clearTimeout(autoFetchTimer.current);
     autoFetchTimer.current = setTimeout(() => {
       void analyzeProfile(trimmed);
@@ -194,7 +210,7 @@ export default function ProfileOptimizationPage() {
     return () => {
       if (autoFetchTimer.current) clearTimeout(autoFetchTimer.current);
     };
-  }, [mapsLink, user, analyzeProfile]);
+  }, [mapsLink, user, analyzeProfile, cachedProfile, business?.mapsPlaceId, doc]);
 
   const handleAnalyze = () => {
     if (!mapsLink.trim()) return;

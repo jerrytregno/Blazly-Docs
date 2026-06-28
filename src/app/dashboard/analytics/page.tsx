@@ -38,7 +38,7 @@ export default function AnalyticsPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`/api/analytics?userId=${user.uid}&refresh=true`);
+      const res = await fetch(`/api/analytics?userId=${user.uid}&refresh=false`);
       if (res.ok) {
         setDoc((await res.json()) as AnalyticsDoc);
       } else {

@@ -1,4 +1,8 @@
 import type { LocalBusiness } from "@/types";
+import {
+  calculateGbpHealth,
+  calculateReviewScore,
+} from "./scoring-engine";
 
 export const VISIBILITY_SCORE_WEIGHTS = {
   ranking: 0.4,
@@ -7,6 +11,17 @@ export const VISIBILITY_SCORE_WEIGHTS = {
   citations: 0.1,
   website: 0.05,
 } as const;
+
+export const VISIBILITY_SCORE_FORMULA =
+  "Visibility Score = (Ranking × 40%) + (GBP Optimization × 25%) + (Reviews × 20%) + (Citations × 10%) + (Website × 5%)";
+
+export interface VisibilityScoreBreakdown {
+  ranking: number;
+  gbp: number;
+  reviews: number;
+  citations: number;
+  website: number;
+}
 
 function clamp(n: number, min = 0, max = 100) {
   return Math.round(Math.max(min, Math.min(max, n)));
@@ -22,32 +37,34 @@ export function calculateRankingScore(rank?: number): number {
   return 20;
 }
 
-function gbpCompletenessScore(listing: LocalBusiness | null): number {
-  if (!listing) return 0;
-  let score = 0;
-  if (listing.title) score += 15;
-  if (listing.phone) score += 15;
-  if (listing.address) score += 15;
-  if (listing.website) score += 15;
-  if (listing.description && listing.description.length >= 80) score += 20;
-  if (listing.open_hours || listing.hours || listing.open_state) score += 10;
-  if ((listing.images?.length ?? 0) >= 3 || listing.thumbnail) score += 10;
-  return clamp(score);
-}
-
-function reviewScore(listing: LocalBusiness | null): number {
-  if (!listing) return 0;
-  const ratingPart = Math.min(((listing.rating ?? 0) / 5) * 100, 100);
-  const volumePart = Math.min(((listing.reviews ?? 0) / 50) * 100, 100);
-  return clamp(ratingPart * 0.6 + volumePart * 0.4);
-}
-
-function citationScoreFromHealth(citationHealth?: number): number {
-  return clamp(citationHealth ?? 50);
-}
-
-function websiteScore(website?: string): number {
+export function calculateWebsiteScore(website?: string): number {
   return website?.trim() ? 100 : 30;
+}
+
+export function computeVisibilityScoreFromComponents(input: {
+  rankingScore: number;
+  gbpOptimization: number;
+  reviewScore: number;
+  citationScore: number;
+  websiteScore: number;
+}): { visibilityScore: number; breakdown: VisibilityScoreBreakdown } {
+  const breakdown: VisibilityScoreBreakdown = {
+    ranking: clamp(input.rankingScore),
+    gbp: clamp(input.gbpOptimization),
+    reviews: clamp(input.reviewScore),
+    citations: clamp(input.citationScore),
+    website: clamp(input.websiteScore),
+  };
+
+  const visibilityScore = clamp(
+    breakdown.ranking * VISIBILITY_SCORE_WEIGHTS.ranking +
+      breakdown.gbp * VISIBILITY_SCORE_WEIGHTS.gbp +
+      breakdown.reviews * VISIBILITY_SCORE_WEIGHTS.reviews +
+      breakdown.citations * VISIBILITY_SCORE_WEIGHTS.citations +
+      breakdown.website * VISIBILITY_SCORE_WEIGHTS.website
+  );
+
+  return { visibilityScore, breakdown };
 }
 
 export function computeVisibilityScoreFromListing(input: {
@@ -59,28 +76,29 @@ export function computeVisibilityScoreFromListing(input: {
     address?: string;
   };
   mapsRank?: number;
+  rankingScore?: number;
   citationHealth?: number;
-}): { visibilityScore: number; breakdown: Record<string, number> } {
-  const ranking = calculateRankingScore(
-    input.mapsRank ?? input.listing?.position ?? undefined
-  );
-  const gbp = gbpCompletenessScore(input.listing);
-  const reviews = reviewScore(input.listing);
-  const citations = citationScoreFromHealth(input.citationHealth);
-  const website = websiteScore(input.business?.website ?? input.listing?.website);
+  gbpOptimization?: number;
+  reviewScore?: number;
+  websiteScore?: number;
+}): { visibilityScore: number; breakdown: VisibilityScoreBreakdown } {
+  const ranking =
+    input.rankingScore ??
+    calculateRankingScore(input.mapsRank ?? input.listing?.position ?? undefined);
+  const gbp = input.gbpOptimization ?? calculateGbpHealth(input.listing);
+  const reviews = input.reviewScore ?? calculateReviewScore(input.listing);
+  const citations = clamp(input.citationHealth ?? 50);
+  const website =
+    input.websiteScore ??
+    calculateWebsiteScore(input.business?.website ?? input.listing?.website);
 
-  const visibilityScore = clamp(
-    ranking * VISIBILITY_SCORE_WEIGHTS.ranking +
-      gbp * VISIBILITY_SCORE_WEIGHTS.gbp +
-      reviews * VISIBILITY_SCORE_WEIGHTS.reviews +
-      citations * VISIBILITY_SCORE_WEIGHTS.citations +
-      website * VISIBILITY_SCORE_WEIGHTS.website
-  );
-
-  return {
-    visibilityScore,
-    breakdown: { ranking, gbp, reviews, citations, website },
-  };
+  return computeVisibilityScoreFromComponents({
+    rankingScore: ranking,
+    gbpOptimization: gbp,
+    reviewScore: reviews,
+    citationScore: citations,
+    websiteScore: website,
+  });
 }
 
 export function computeCompetitorVisibilityScore(input: {

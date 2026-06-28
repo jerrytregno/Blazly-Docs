@@ -1,23 +1,46 @@
 import type { LocalBusiness } from "@/types";
-import { calculateLocalVisibility } from "@/lib/seo/scoring-engine";
+import {
+  calculateGbpHealth,
+  calculateReviewScore,
+} from "@/lib/seo/scoring-engine";
+import {
+  calculateRankingScore,
+  calculateWebsiteScore,
+  computeVisibilityScoreFromComponents,
+} from "@/lib/seo/visibility-score";
 
 /**
- * Maps search visibility for a keyword research query.
- * Uses live Maps rank for the current search plus GBP signals from the place profile.
+ * Visibility for keyword research using the standard weighted formula.
  */
 export function computeKeywordResearchVisibility(
   listing: LocalBusiness | null,
-  mapsPosition?: number
+  mapsPosition?: number,
+  context?: {
+    citationHealth?: number;
+    website?: string;
+    profileCompleteness?: number;
+  }
 ): number {
   if (!listing && (!mapsPosition || mapsPosition <= 0)) {
     return 10;
   }
 
-  const enriched: LocalBusiness = {
-    ...(listing ?? {}),
-    position:
-      mapsPosition && mapsPosition > 0 ? mapsPosition : listing?.position,
-  };
+  const rankingScore = calculateRankingScore(
+    mapsPosition && mapsPosition > 0 ? mapsPosition : listing?.position
+  );
+  const gbpOptimization =
+    context?.profileCompleteness ?? calculateGbpHealth(listing);
+  const reviewScore = calculateReviewScore(listing);
+  const citationScore = context?.citationHealth ?? 50;
+  const websiteScore = calculateWebsiteScore(
+    context?.website ?? listing?.website
+  );
 
-  return calculateLocalVisibility(enriched);
+  return computeVisibilityScoreFromComponents({
+    rankingScore,
+    gbpOptimization,
+    reviewScore,
+    citationScore,
+    websiteScore,
+  }).visibilityScore;
 }

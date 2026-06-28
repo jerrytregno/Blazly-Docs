@@ -7,7 +7,7 @@ import { CitationTrackerTable } from "@/components/features/citation-tracker-tab
 import { NapConsistencyPanel } from "@/components/features/nap-consistency-panel";
 import { InsightPanel } from "@/components/dashboard/widgets";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Link from "next/link";
+import { ProFeatureLink } from "@/components/billing/pro-feature-link";
 
 export default function CitationsPage() {
   const { rankings } = useData();
@@ -27,9 +27,13 @@ export default function CitationsPage() {
                   Other Directories: {c?.otherDirectories.listed ?? 0}/{c?.otherDirectories.total ?? 0}
                 </p>
               </div>
-              <Link href="/dashboard/franchise-tracking" className="text-sm text-indigo-600 hover:text-indigo-700">
+              <ProFeatureLink
+                href="/dashboard/franchise-tracking"
+                featureLabel="Franchise Tracking"
+                className="inline-flex items-center text-sm text-indigo-600 hover:text-indigo-700"
+              >
                 Open Franchise Tracking →
-              </Link>
+              </ProFeatureLink>
             </div>
           </CardContent>
         </Card>

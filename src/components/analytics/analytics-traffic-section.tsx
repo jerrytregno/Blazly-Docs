@@ -16,18 +16,16 @@ import { cn } from "@/lib/utils";
 import type { AnalyticsDailyPoint, AnalyticsTrafficSummary } from "@/types/firestore";
 
 type RangeKey = "7" | "14" | "30";
-type MetricKey = "websiteTraffic" | "gbpViews" | "engagement";
+type MetricKey = "websiteTraffic" | "gbpViews";
 
 const METRIC_LABELS: Record<MetricKey, string> = {
   websiteTraffic: "Maps Website Clicks",
   gbpViews: "GBP Views",
-  engagement: "Maps Engagement",
 };
 
 const SUMMARY_UNIT: Record<MetricKey, string> = {
   websiteTraffic: "visits",
   gbpViews: "views",
-  engagement: "actions",
 };
 
 export function AnalyticsTrafficSection({

@@ -6,15 +6,26 @@ import { useData } from "@/components/providers/data-provider";
 import { PageDataGuard } from "@/components/data/page-data-guard";
 import { FranchiseListingsTable } from "@/components/features/franchise-listings-table";
 import { FeaturePanel } from "@/components/features/feature-panel";
+import { InsightPanel } from "@/components/dashboard/widgets";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useFranchiseListings } from "@/hooks/use-franchise-listings";
 
 export default function FranchiseTrackingPage() {
-  const { analyzing, runAnalysis, canRerunAnalysis, analysisCooldownMessage } =
-    useData();
+  const {
+    analyzing,
+    runAnalysis,
+    canRerunAnalysis,
+    analysisCooldownMessage,
+    business,
+    rankings,
+  } = useData();
   const { listings, liveCount, summary, hasData } = useFranchiseListings();
-  const { business } = useData();
+
+  const citationHealth = rankings?.citationHealth;
+  const competitorGaps = citationHealth?.competitorCitations ?? [];
+  const missingDirectories = citationHealth?.missingDirectories ?? [];
+  const citationOpportunities = citationHealth?.opportunities ?? [];
 
   const listed = useMemo(
     () => listings.filter((l) => l.status === "live"),
@@ -24,6 +35,18 @@ export default function FranchiseTrackingPage() {
     () => listings.filter((l) => l.status === "missing" || l.status === "dead"),
     [listings]
   );
+
+  const fallbackGaps = useMemo(() => {
+    if (competitorGaps.length > 0) return competitorGaps;
+    const leader =
+      rankings?.competitors?.find((c) => !c.isYou)?.name ??
+      rankings?.competitionAnalysis?.topCompetitor?.name ??
+      "Top competitors";
+    return missing
+      .filter((l) => l.value >= 70)
+      .slice(0, 5)
+      .map((l) => `${leader} is likely listed on ${l.directory} — you're not yet.`);
+  }, [competitorGaps, missing, rankings]);
 
   return (
     <PageDataGuard>
@@ -118,6 +141,43 @@ export default function FranchiseTrackingPage() {
                 emptyMessage="Great — no missing high-value directories detected."
               />
             </FeaturePanel>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <InsightPanel
+                title="Where competitors are listed (but you are not)"
+                items={
+                  fallbackGaps.length > 0
+                    ? fallbackGaps
+                    : ["No competitor citation gaps detected — refresh analysis to update."]
+                }
+                variant="ai"
+              />
+              <InsightPanel
+                title="Missing high-value directories"
+                items={
+                  missingDirectories.length > 0
+                    ? missingDirectories.map(
+                        (dir) => `You're not listed on ${dir} yet — consider submitting your profile.`
+                      )
+                    : missing.length > 0
+                      ? missing
+                          .filter((l) => l.value >= 70)
+                          .slice(0, 5)
+                          .map(
+                            (l) =>
+                              `You're not listed on ${l.directory} yet — competitors may be visible here.`
+                          )
+                      : ["All key directories appear covered for your market."]
+                }
+              />
+            </div>
+
+            {citationOpportunities.length > 0 && (
+              <InsightPanel
+                title="Citation opportunities"
+                items={citationOpportunities}
+              />
+            )}
           </>
         )}
       </div>

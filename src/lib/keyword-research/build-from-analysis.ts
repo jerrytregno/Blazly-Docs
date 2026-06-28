@@ -1,6 +1,5 @@
 import type { LocalBusiness } from "@/types";
 import type {
-  Keyword,
   KeywordOpportunity,
   KeywordResearchListing,
   KeywordResearchReport,
@@ -9,7 +8,6 @@ import type {
 import { imageCountFromListing } from "@/lib/seo/real-data";
 import { buildSearchQuery } from "./fetch-rankings";
 import { buildVisibilityScores } from "./build-scores";
-import { generateKeywordOpportunities } from "./gemini-keyword-research";
 
 function listingsFromMapsResults(
   results: LocalBusiness[],
@@ -98,11 +96,11 @@ export function rankTrackerSeedMatchesSearch(
   );
 }
 
-export async function buildRankTrackerReportFromAnalysis(input: {
+export function buildRankTrackerReportFromAnalysis(input: {
   seed: RankTrackerSeed;
   profileCompleteness?: number;
   userListing?: LocalBusiness | null;
-}): Promise<KeywordResearchReport> {
+}): KeywordResearchReport {
   const scores = buildVisibilityScores({
     yourPosition: input.seed.yourPosition,
     yourListing: input.userListing ?? null,
@@ -110,19 +108,25 @@ export async function buildRankTrackerReportFromAnalysis(input: {
     profileCompleteness: input.profileCompleteness,
   });
 
-  const keywords: KeywordOpportunity[] = await generateKeywordOpportunities({
-    category: input.seed.category,
-    location: input.seed.location,
-    businessName: input.seed.listings.find((l) => l.isYou)?.name ?? "",
-  }).catch((): KeywordOpportunity[] =>
-    input.seed.listings.slice(0, 5).map((l, i) => ({
-      keyword: `${input.seed.category} ${input.seed.location}`.trim(),
-      tier: i === 0 ? "primary" : "secondary",
-      searchVolume: Math.max(50, 100 - i * 10),
+  const keywords: KeywordOpportunity[] = [
+    {
+      keyword: input.seed.query,
+      tier: "primary",
+      searchVolume: 500,
       competitionScore: 50,
-      difficulty: 40 + i * 5,
-    }))
-  );
+      difficulty: 45,
+    },
+    ...input.seed.listings
+      .filter((l) => !l.isYou)
+      .slice(0, 4)
+      .map((l, i) => ({
+        keyword: `${l.category || input.seed.category} ${input.seed.location}`.trim(),
+        tier: (i === 0 ? "secondary" : "long-tail") as KeywordOpportunity["tier"],
+        searchVolume: Math.max(50, 120 - i * 15),
+        competitionScore: 40 + i * 5,
+        difficulty: 35 + i * 8,
+      })),
+  ];
 
   return {
     category: input.seed.category,
