@@ -1,6 +1,7 @@
 import type {
   BusinessDoc,
   KeywordResearchReport,
+  RankTrackerSeed,
 } from "@/types/firestore";
 import { fetchGoogleMapsPlace } from "@/lib/searchapi";
 import { parseGoogleMapsPlaceId } from "@/lib/seo/maps-place";
@@ -8,6 +9,10 @@ import { resolveSearchLocation } from "@/lib/seo/analysis-location";
 import { fetchTopLocalRankings } from "./fetch-rankings";
 import { buildVisibilityScores } from "./build-scores";
 import { fetchCompetitorDeepDive } from "./competitor-detail";
+import {
+  buildRankTrackerReportFromAnalysis,
+  rankTrackerSeedMatchesSearch,
+} from "./build-from-analysis";
 import {
   generateKeywordOpportunities,
   generateRankingStrategy,
@@ -21,7 +26,32 @@ export async function buildKeywordResearchReport(input: {
   competitorPlaceId?: string;
   includeStrategy?: boolean;
   profileCompleteness?: number;
+  rankTrackerSeed?: RankTrackerSeed | null;
+  preferAnalysisCache?: boolean;
 }): Promise<KeywordResearchReport> {
+  if (
+    input.preferAnalysisCache &&
+    rankTrackerSeedMatchesSearch(input.rankTrackerSeed, input.category, input.location)
+  ) {
+    const cachedReport = buildRankTrackerReportFromAnalysis({
+      seed: input.rankTrackerSeed!,
+      profileCompleteness: input.profileCompleteness,
+    });
+
+    if (input.includeStrategy) {
+      cachedReport.strategy = await generateRankingStrategy({
+        businessName: input.business.name,
+        category: input.category,
+        location: input.location,
+        yourPosition: cachedReport.yourPosition,
+        listings: cachedReport.listings,
+        competitorDetail: undefined,
+        scores: cachedReport.scores,
+      });
+    }
+
+    return cachedReport;
+  }
   const placeId = parseGoogleMapsPlaceId(input.business.mapsPlaceId ?? "");
   let userListing = null;
   let lat: number | undefined;

@@ -8,14 +8,13 @@ import { PageDataGuard } from "@/components/data/page-data-guard";
 import { FeaturePanel } from "@/components/features/feature-panel";
 import {
   COMPETITION_LEVEL_STYLES,
+  hasAnalysisSeededCompetition,
   isCompetitionDataCurrent,
   resolveCompetitionAnalysis,
 } from "@/lib/seo/competition-analysis";
 import { resolveSearchLocation } from "@/lib/seo/analysis-location";
 import { fetchCompetitionScan } from "@/lib/seo/client";
-import { fetchMapsCategoryRank } from "@/lib/seo/maps-rank";
-import { parseGoogleMapsPlaceId } from "@/lib/seo/maps-place";
-import { regionGl, resolveSearchRegionId } from "@/lib/seo/search-regions";
+import { resolveSearchRegionId } from "@/lib/seo/search-regions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,10 +43,6 @@ export default function CompetitorAnalysisPage() {
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const scanStartedRef = useRef(false);
-  const [mapsRankOverride, setMapsRankOverride] = useState<{
-    rank: number;
-    query: string;
-  } | null>(null);
 
   const category = business?.primaryCategory || "Local business";
   const location = resolveSearchLocation(business ?? {}) || business?.city || "Your market";
@@ -69,17 +64,9 @@ export default function CompetitorAnalysisPage() {
     return rankings?.competitors ?? [];
   }, [isDataCurrent, rankings?.competitors]);
 
-  const analysis = useMemo(() => {
-    if (!baseAnalysis) return null;
-    if (mapsRankOverride) {
-      return {
-        ...baseAnalysis,
-        yourRank: mapsRankOverride.rank,
-        mapsRankQuery: mapsRankOverride.query,
-      };
-    }
-    return baseAnalysis;
-  }, [baseAnalysis, mapsRankOverride]);
+  const analysis = baseAnalysis;
+
+  const seededFromAnalysis = hasAnalysisSeededCompetition(rankings, dashboard);
 
   const runCompetitionScan = useCallback(async () => {
     if (!business?.name) return;
@@ -107,47 +94,22 @@ export default function CompetitorAnalysisPage() {
   }, [business, category, location, resolvedRegion, saveRankings]);
 
   useEffect(() => {
-    setMapsRankOverride(null);
     scanStartedRef.current = false;
   }, [business?.name, category, location]);
 
   useEffect(() => {
     if (loading || !business?.name || !user) return;
-    if (isDataCurrent || scanning || scanStartedRef.current) return;
+    if (isDataCurrent || scanning || scanStartedRef.current || seededFromAnalysis) return;
     scanStartedRef.current = true;
     void runCompetitionScan();
-  }, [loading, business?.name, user, isDataCurrent, scanning, runCompetitionScan]);
-
-  useEffect(() => {
-    if (!baseAnalysis?.mapsRankQuery || !business?.mapsPlaceId) return;
-    const placeId = parseGoogleMapsPlaceId(business.mapsPlaceId);
-    if (!placeId) return;
-
-    const gl = regionGl(resolvedRegion);
-
-    let cancelled = false;
-    void fetchMapsCategoryRank({
-      category,
-      location,
-      placeId,
-      businessName: business.name,
-      gl,
-    }).then((result) => {
-      if (!cancelled && result.rank > 0) {
-        setMapsRankOverride({ rank: result.rank, query: result.query });
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
   }, [
-    baseAnalysis?.mapsRankQuery,
-    business?.mapsPlaceId,
+    loading,
     business?.name,
-    category,
-    location,
-    resolvedRegion,
+    user,
+    isDataCurrent,
+    scanning,
+    seededFromAnalysis,
+    runCompetitionScan,
   ]);
 
   const styles = analysis ? COMPETITION_LEVEL_STYLES[analysis.level] : null;

@@ -30,6 +30,7 @@ export interface LiveCompetitorRef {
 
 export interface LiveAnalyticsSnapshot {
   fetchedAt: string;
+  fromAnalysisCache?: boolean;
   userPlace: LocalBusiness | null;
   competitorPlace: LocalBusiness | null;
   competitor: LiveCompetitorRef;
@@ -196,6 +197,90 @@ async function resolveCompetitorPlace(
 
 function placeDetail(place: LocalBusiness | null) {
   return place;
+}
+
+function listingFromAnalysis(input: BuildAnalyticsInput): LocalBusiness | null {
+  const placeId = parseGoogleMapsPlaceId(input.business.mapsPlaceId ?? "");
+  const you = input.rankings.competitors?.find((c) => c.isYou);
+  const m = input.dashboard.metrics;
+  if (!placeId && !you) return null;
+
+  return {
+    place_id: placeId ?? undefined,
+    title: input.business.name,
+    rating: m.averageRating || you?.rating,
+    reviews: m.totalReviews || you?.reviews,
+    position: you?.rank || input.rankings.competitionAnalysis?.yourRank,
+    address: input.business.address,
+    website: input.business.website,
+    phone: input.business.phone,
+    type: input.business.primaryCategory,
+  };
+}
+
+export function shouldUseCachedAnalytics(input: BuildAnalyticsInput): boolean {
+  return input.dashboard.analysisStatus === "complete";
+}
+
+/** Reuse onboarding analysis data — zero SearchAPI calls. */
+export function buildCachedAnalyticsSnapshot(
+  input: BuildAnalyticsInput
+): LiveAnalyticsSnapshot {
+  const rival = pickCompetitor(
+    input.rankings.competitors ?? [],
+    input.rankings.competitionAnalysis
+  );
+  const userPlace = listingFromAnalysis(input);
+  const visibilityQueries = input.rankings.visibilityQueries ?? [];
+  const localVisibility =
+    input.dashboard.metrics.localVisibility ?? input.dashboard.visibilityScore ?? 0;
+  const organicTraffic = input.dashboard.metrics.organicTraffic ?? 0;
+
+  const visibility: VisibilityMetrics | null =
+    visibilityQueries.length > 0 || localVisibility > 0
+      ? {
+          aiVisibility: localVisibility,
+          organicTraffic,
+          localVisibility,
+          platformSignals: input.rankings.aiSearchSignals ?? {
+            chatgpt: { mentions: 0, cited: 0 },
+            aiOverview: { mentions: 0, cited: 0 },
+            aiMode: { mentions: 0, cited: 0 },
+            gemini: { mentions: 0, cited: 0 },
+          },
+          searchQueries: visibilityQueries,
+        }
+      : null;
+
+  return {
+    fetchedAt: new Date().toISOString(),
+    fromAnalysisCache: true,
+    userPlace,
+    competitorPlace: null,
+    competitor: rival,
+    visibility,
+    userReviewsHistogram: null,
+    competitorReviewsHistogram: null,
+    userNewReviews30d:
+      input.dashboard.metrics.reviewsThisMonth ?? input.reviews.inbox?.length ?? null,
+    competitorNewReviews30d: null,
+    userRecentReviews: [],
+    competitorRecentReviews: [],
+    userWeeklyHours:
+      input.business.weeklyHours?.length
+        ? input.business.weeklyHours
+        : userPlace
+          ? openHoursToWeekly(userPlace)
+          : null,
+    competitorWeeklyHours: null,
+    liveFields: {
+      userPlace: Boolean(userPlace),
+      competitorPlace: false,
+      visibility: Boolean(visibility),
+      reviewsHistogram: false,
+      recentReviews: false,
+    },
+  };
 }
 
 export async function fetchLiveAnalyticsData(

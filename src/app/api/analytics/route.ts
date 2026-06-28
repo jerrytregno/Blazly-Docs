@@ -64,9 +64,10 @@ export async function GET(request: NextRequest) {
 
     const uid = userId.trim();
     const existing = await getAnalytics(uid);
-    const refresh = request.nextUrl.searchParams.get("refresh") !== "false";
+    const forceRefresh = request.nextUrl.searchParams.get("refresh") === "true";
+    const shouldBuild = forceRefresh || !existing?.report;
 
-    if (refresh) {
+    if (shouldBuild) {
       const fresh = await buildAndStore(uid, 30, existing?.aiInsights ?? null);
       if (fresh) {
         return NextResponse.json(fresh);

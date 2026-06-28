@@ -256,6 +256,13 @@ export default function RankTrackerPage() {
                 </span>
               )}
             </p>
+            {report?.yourPosition ? (
+              <p className="mt-2 text-sm font-semibold text-indigo-600">
+                Google Maps rank #{report.yourPosition}
+              </p>
+            ) : report ? (
+              <p className="mt-2 text-sm font-medium text-slate-500">Not in top 10</p>
+            ) : null}
           </div>
           <Button
             variant="outline"

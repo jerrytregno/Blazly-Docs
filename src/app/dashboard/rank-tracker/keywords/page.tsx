@@ -5,7 +5,6 @@ import { PageDataGuard } from "@/components/data/page-data-guard";
 import { InsightPanel } from "@/components/dashboard/widgets";
 import { ShareOfVoicePanel } from "@/components/features/share-of-voice-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
 export default function KeywordsPage() {
@@ -42,11 +41,6 @@ export default function KeywordsPage() {
           </CardContent>
         </Card>
         <ShareOfVoicePanel data={rankings?.shareOfVoice} />
-        <div className="flex justify-end">
-          <Link href="/dashboard/rank-tracker/geo-grid" className="text-sm text-indigo-600 hover:text-indigo-700">
-            View geo-grid rankings →
-          </Link>
-        </div>
         <InsightPanel title="AI Ranking Insights" items={rankings?.aiRankingInsights.length ? rankings.aiRankingInsights : ["Add keywords to get AI insights"]} variant="ai" />
       </div>
     </PageDataGuard>

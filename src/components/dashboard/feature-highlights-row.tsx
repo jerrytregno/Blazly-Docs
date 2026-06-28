@@ -10,9 +10,11 @@ import {
   Radar,
   BarChart3,
   TrendingUp,
+  Building2,
 } from "lucide-react";
 import { useUpgradeModal } from "@/components/billing/upgrade-modal-provider";
 import { usePlan } from "@/components/providers/plan-provider";
+import { useFranchiseListings } from "@/hooks/use-franchise-listings";
 import type { DashboardDoc, ProfileOptimizationDoc, RankingsDoc, ReviewsDoc } from "@/types/firestore";
 
 interface ToolItem {
@@ -37,8 +39,9 @@ export function FeatureHighlightsRow({
   business?: unknown;
   profileOptimization?: ProfileOptimizationDoc | null;
 }) {
-  const { isPro } = usePlan();
+  const { hasPaidAccess } = usePlan();
   const { openUpgradeModal } = useUpgradeModal();
+  const { liveCount } = useFranchiseListings();
   const pendingReplies = reviews?.inbox.filter((r) => !r.replied).length ?? 0;
   const competition = rankings?.competitionAnalysis;
   const profileScore = profileOptimization?.scores.profileCompleteness;
@@ -64,6 +67,16 @@ export function FeatureHighlightsRow({
       detail: competition
         ? `${competition.category} · ${competition.location} · ${competition.competitorCount} competitors`
         : undefined,
+    },
+    {
+      title: "Franchise Tracking",
+      description:
+        "See how many directories list your business profile and open each live listing or submit missing ones.",
+      href: "/dashboard/franchise-tracking",
+      icon: Building2,
+      requiresPro: true,
+      metric: liveCount > 0 ? String(liveCount) : undefined,
+      metricLabel: "live listings",
     },
     {
       title: "Rank Tracker",
@@ -118,7 +131,7 @@ export function FeatureHighlightsRow({
 
       <div className="space-y-3">
         {tools.map((tool, index) => {
-          const locked = tool.requiresPro && !isPro;
+          const locked = tool.requiresPro && !hasPaidAccess;
           const content = (
             <>
               <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-indigo-600 transition-colors group-hover:border-indigo-200 group-hover:bg-indigo-50">

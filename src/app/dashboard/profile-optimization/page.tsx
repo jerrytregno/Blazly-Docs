@@ -62,7 +62,7 @@ function FieldStatusBadge({ status }: { status: string }) {
 
 export default function ProfileOptimizationPage() {
   const { user } = useAuth();
-  const { business, saveProfileOptimization } = useData();
+  const { business, saveProfileOptimization, profileOptimization: cachedProfile } = useData();
   const [doc, setDoc] = useState<ProfileOptimizationDoc | null>(null);
   const [mapsLink, setMapsLink] = useState("");
   const [loading, setLoading] = useState(true);
@@ -118,6 +118,22 @@ export default function ProfileOptimizationPage() {
     if (!user) return;
     setLoading(true);
     try {
+      if (cachedProfile?.analyzedAt && cachedProfile.snapshot) {
+        const businessMaps = business?.mapsPlaceId?.trim() ?? "";
+        const dataKey = normalizeMapsKey(cachedProfile.mapsLink);
+        const businessKey = normalizeMapsKey(businessMaps);
+        if (!businessKey || !dataKey || businessKey === dataKey) {
+          setDoc({ ...cachedProfile, userId: user.uid, enhancement: cachedProfile.enhancement ?? null });
+          if (cachedProfile.mapsLink) {
+            setMapsLink(cachedProfile.mapsLink);
+            lastFetchedKey.current = dataKey;
+          } else if (businessMaps) {
+            setMapsLink(businessMaps);
+          }
+          return;
+        }
+      }
+
       const res = await fetch(`/api/profile/analyze?userId=${user.uid}`);
       if (!res.ok) return;
 
@@ -145,7 +161,7 @@ export default function ProfileOptimizationPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, business?.mapsPlaceId]);
+  }, [user, business?.mapsPlaceId, cachedProfile]);
 
   useEffect(() => {
     const businessMaps = business?.mapsPlaceId?.trim();
@@ -170,6 +186,22 @@ export default function ProfileOptimizationPage() {
     const mapsKey = normalizeMapsKey(trimmed);
     if (mapsKey === lastFetchedKey.current) return;
 
+    if (
+      cachedProfile?.analyzedAt &&
+      cachedProfile.snapshot &&
+      mapsKey === normalizeMapsKey(cachedProfile.mapsLink || business?.mapsPlaceId || "")
+    ) {
+      lastFetchedKey.current = mapsKey;
+      if (!doc) {
+        setDoc({
+          ...cachedProfile,
+          userId: user.uid,
+          enhancement: cachedProfile.enhancement ?? null,
+        });
+      }
+      return;
+    }
+
     if (autoFetchTimer.current) clearTimeout(autoFetchTimer.current);
     autoFetchTimer.current = setTimeout(() => {
       void analyzeProfile(trimmed);
@@ -178,7 +210,7 @@ export default function ProfileOptimizationPage() {
     return () => {
       if (autoFetchTimer.current) clearTimeout(autoFetchTimer.current);
     };
-  }, [mapsLink, user, analyzeProfile]);
+  }, [mapsLink, user, analyzeProfile, cachedProfile, business?.mapsPlaceId, doc]);
 
   const handleAnalyze = () => {
     if (!mapsLink.trim()) return;

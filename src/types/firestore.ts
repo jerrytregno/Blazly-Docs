@@ -227,6 +227,8 @@ export interface CitationListing {
   value: number;
   submitable: boolean;
   url?: string;
+  profileName?: string;
+  submitUrl?: string;
 }
 
 export interface NapField {
@@ -352,8 +354,19 @@ export interface CompetitionAnalysis {
   searchedAt: string;
 }
 
+export interface RankTrackerSeed {
+  category: string;
+  location: string;
+  query: string;
+  listings: KeywordResearchListing[];
+  yourPosition?: number;
+  yourPlaceId?: string;
+  analyzedAt: string;
+}
+
 export interface RankingsDoc {
   userId: string;
+  rankTrackerSeed?: RankTrackerSeed;
   aiSearchSignals?: {
     chatgpt: { mentions: number; cited: number };
     aiOverview: { mentions: number; cited: number };
@@ -530,7 +543,6 @@ export interface AnalyticsScores {
   trafficScore: number;
   reviewScore: number;
   reputationScore: number;
-  engagementScore: number;
   visibilityScore: number;
   overallScore: number;
 }

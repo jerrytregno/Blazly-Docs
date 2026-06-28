@@ -9,7 +9,6 @@ const SCORE_ITEMS: { key: keyof AnalyticsScores; label: string; color: string }[
   { key: "trafficScore", label: "Traffic Score", color: "text-indigo-600" },
   { key: "reviewScore", label: "Review Score", color: "text-violet-600" },
   { key: "reputationScore", label: "Reputation Score", color: "text-amber-600" },
-  { key: "engagementScore", label: "Engagement Score", color: "text-emerald-600" },
   { key: "visibilityScore", label: "Visibility Score", color: "text-cyan-600" },
 ];
 
@@ -19,7 +18,7 @@ export function AnalyticsScoresSection({ scores }: { scores: AnalyticsScores }) 
       <CardContent className="p-6">
         <h2 className="text-lg font-semibold text-gray-900">SEO & visibility scores</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Composite scores based on traffic, reviews, reputation, engagement, and visibility
+          Composite scores based on traffic, reviews, reputation, and visibility
         </p>
 
         <div className="mt-6 flex flex-col items-center gap-8 lg:flex-row lg:items-start">

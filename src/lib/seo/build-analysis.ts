@@ -14,21 +14,35 @@ import {
   buildGbpAuditChecklist,
   buildShareOfVoice,
   competitorCitationGaps,
+  enrichCitationListingUrls,
+  summarizeFranchiseListings,
   TOP_DIRECTORIES,
 } from "./citation-catalog";
 import { buildNapAudit, napListingSyncStatus } from "./nap-audit";
 import {
   openHoursToWeekly,
   imageCountFromListing,
-  fetchRealReviews,
-  trackKeywords,
-  buildRealGeoGrid,
+  fetchUnansweredReviewsBatch,
+  reviewsDocFromBatchFetch,
+  REVIEWS_API_CALLS_PER_BATCH,
+  UNANSWERED_BATCH_SIZE,
   buildKeywordGroups,
   buildActivityFeed,
   buildStrategistTasks,
   buildStrategistRecommendations,
 } from "./real-data";
-import { computeVisibilityMetrics, keywordRankingProgress } from "./visibility-metrics";
+import { buildVisibilityFromAnalysis, keywordRankingProgress } from "./visibility-metrics";
+import {
+  computeVisibilityScoreFromComponents,
+  calculateRankingScore,
+  calculateWebsiteScore,
+} from "./visibility-score";
+import {
+  buildOrganicMetricsInput,
+  fetchOrganicPerformanceMetrics,
+} from "./organic-metrics";
+import { buildProfileOptimizationFromListing } from "./profile-optimization";
+import { buildRankTrackerSeed } from "@/lib/keyword-research/build-from-analysis";
 import { regionGl } from "./search-regions";
 import { analyzeCompetition } from "./competition-analysis";
 import { fetchMapsCategoryRank } from "./maps-rank";
@@ -168,15 +182,15 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
   const ll = discovery.ll;
   const searchQuery = discovery.searchQueryUsed;
 
-  const competitionCategory = category || input.category || input.businessName;
-  const competitionLocation = location || input.location || "";
-
   let mapsRank = 0;
   let mapsRankQuery = "";
-  if (listing?.place_id && competitionLocation) {
+  let mapsRankResults: LocalBusiness[] = [];
+  const preliminaryCategory = category || input.businessName;
+  const preliminaryLocation = location || "";
+  if (listing?.place_id && preliminaryLocation) {
     const rankResult = await fetchMapsCategoryRank({
-      category: competitionCategory,
-      location: competitionLocation,
+      category: preliminaryCategory,
+      location: preliminaryLocation,
       placeId: listing.place_id,
       businessName: input.businessName,
       ll,
@@ -186,12 +200,16 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
     });
     mapsRank = rankResult.rank;
     mapsRankQuery = rankResult.query;
+    mapsRankResults = rankResult.results;
     if (mapsRank > 0) {
       listing = { ...listing, position: mapsRank };
     }
   }
 
   const business = buildBusinessUpdate(listing, input);
+  const competitionCategory = business.primaryCategory || category || input.businessName;
+  const competitionLocation =
+    [business.city, business.state].filter(Boolean).join(", ") || location || "";
   const napAudit = buildNapAudit(listing, {
     name: business.name,
     phone: business.phone,
@@ -222,9 +240,10 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
     }
   );
 
-  const competitors = buildCompetitors(results, listing, input.businessName);
+  const competitorResults = mapsRankResults.length > 0 ? mapsRankResults : results;
+  const competitors = buildCompetitors(competitorResults, listing, input.businessName);
   const competitionAnalysis = analyzeCompetition({
-    results,
+    results: competitorResults,
     listing,
     category: competitionCategory,
     location: competitionLocation,
@@ -232,7 +251,19 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
     mapsRank: mapsRank > 0 ? mapsRank : undefined,
     mapsRankQuery: mapsRankQuery || undefined,
   });
-  const citationListings = buildCitationListings(listing, scores.citationHealth);
+  const citationListings = enrichCitationListingUrls(
+    buildCitationListings(listing, scores.citationHealth),
+    {
+      businessName: business.name,
+      mapsPlaceId: business.mapsPlaceId ?? listing?.place_id,
+      address: business.address,
+      city: business.city,
+      state: business.state,
+      zip: business.zip,
+      phone: business.phone,
+      website: business.website,
+    }
+  );
   const competitorNames = competitors.filter((c) => !c.isYou).map((c) => c.name);
   const gbpAuditChecklist = buildGbpAuditChecklist(listing);
   const citationGaps = competitorCitationGaps(citationListings, competitorNames);
@@ -246,35 +277,64 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
   const yourReviews = listing?.reviews ?? 0;
   const reviewGap = Math.max(0, topCompetitorReviews - yourReviews);
 
-  const keywordQuery = category || business.primaryCategory || input.businessName;
-  const geoKeyword = keywordQuery;
+  const keywordQuery = competitionCategory || business.primaryCategory || input.businessName;
 
-  const [reviewData, keywords, geoGrid, geminiAudit] = await Promise.all([
+  const [reviewBatch, organicMetrics, geminiAudit] = await Promise.all([
     listing?.place_id
-      ? fetchRealReviews(listing.place_id, gl).catch(() => null)
-      : Promise.resolve(null),
-    location
-      ? trackKeywords(
-          input.businessName,
-          keywordQuery,
-          location,
-          listing?.place_id,
-          ll,
+      ? fetchUnansweredReviewsBatch(listing.place_id, {
           gl,
-          input.website
-        ).catch(() => [] as RankingsDoc["keywords"])
-      : Promise.resolve([] as RankingsDoc["keywords"]),
-    listing?.gps_coordinates
-      ? buildRealGeoGrid(listing, geoKeyword, input.businessName, gl).catch(() => null)
+          maxPages: REVIEWS_API_CALLS_PER_BATCH,
+          targetCount: UNANSWERED_BATCH_SIZE,
+        }).catch(() => null)
       : Promise.resolve(null),
+    fetchOrganicPerformanceMetrics(
+      buildOrganicMetricsInput({
+        businessName: input.businessName,
+        category: keywordQuery,
+        location: competitionLocation || business.city || "",
+        listing,
+        mapsRank: mapsRank > 0 ? mapsRank : listing?.position,
+        visibilityScore: scores.localVisibility,
+        gbpHealth: scores.gbpHealth,
+      })
+    ).catch(() => ({
+      authorityScore: scores.overallScore,
+      organicTraffic: Math.max(100, (listing?.reviews ?? 10) * 12),
+      keywords: [] as RankingsDoc["keywords"],
+    })),
     generateSeoAudit({
       businessName: input.businessName,
       keyword: keywordQuery,
-      location: location || business.city || "",
+      location: competitionLocation || business.city || "",
       targetBusiness: listing ?? undefined,
-      competitors: results.filter((r) => r.place_id !== listing?.place_id),
+      competitors: competitorResults.filter((r) => r.place_id !== listing?.place_id),
     }).catch(() => null),
   ]);
+
+  const keywords: RankingsDoc["keywords"] =
+    organicMetrics.keywords.length > 0
+      ? organicMetrics.keywords
+      : mapsRankQuery
+        ? [
+            {
+              keyword: mapsRankQuery,
+              rank: mapsRank,
+              volume: 500,
+              change: 0,
+              group: "Local",
+            },
+          ]
+        : listing?.position
+          ? [
+              {
+                keyword: keywordQuery,
+                rank: listing.position,
+                volume: 300,
+                change: 0,
+                group: "Local",
+              },
+            ]
+          : [];
 
   const aiRecommendations = [
     ...(geminiAudit?.recommendations ?? []),
@@ -285,17 +345,19 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
     ? [geminiAudit.analysis.split("\n")[0].slice(0, 200)]
     : [];
 
-  const visibility = await computeVisibilityMetrics({
+  const visibility = buildVisibilityFromAnalysis({
     listing,
     businessName: input.businessName,
     category: keywordQuery,
-    location: location || business.city || "",
-    placeId: listing?.place_id,
-    ll,
-    gl,
+    location: competitionLocation || business.city || "",
+    mapsRank: mapsRank > 0 ? mapsRank : undefined,
+    mapsRankQuery: mapsRankQuery || undefined,
     keywords,
-    geoGrid,
-  }).catch(() => null);
+    localVisibility: scores.localVisibility,
+    organicTraffic:
+      organicMetrics.organicTraffic ??
+      Math.max(1, Math.round((scores.localVisibility / 100) * (listing?.reviews ?? 10))),
+  });
 
   const top3Count = keywords.filter((k) => k.rank > 0 && k.rank <= 3).length;
   const top10Count = keywords.filter((k) => k.rank > 0 && k.rank <= 10).length;
@@ -308,9 +370,9 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
       : listing?.position ?? 0;
 
   const responseRate =
-    reviewData && reviewData.inbox.length > 0
+    reviewBatch && reviewBatch.inbox.length > 0
       ? Math.round(
-          (reviewData.inbox.filter((r) => r.replied).length / reviewData.inbox.length) * 100
+          (reviewBatch.inbox.filter((r) => r.replied).length / reviewBatch.inbox.length) * 100
         )
       : 0;
 
@@ -324,7 +386,7 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
     {
       napScore: napAudit.score,
       responseRate,
-      recentReviewCount: reviewData?.inbox.length,
+      recentReviewCount: reviewBatch?.inbox.length,
       business: {
         name: business.name,
         website: business.website,
@@ -340,30 +402,38 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
   const keywordRankingScore = keywordRankingProgress(
     keywords,
     listing,
-    geoGrid,
+    null,
     visibility?.localVisibility,
     scores.localVisibility
   );
 
-  const resolvedLocalVisibility =
-    visibility?.localVisibility && visibility.localVisibility > 0
-      ? visibility.localVisibility
-      : geoGrid?.visibilityScore && geoGrid.visibilityScore > 0
-        ? geoGrid.visibilityScore
-        : keywordRankingScore > 0
-          ? keywordRankingScore
-          : scores.localVisibility;
+  const citationListingScore = summarizeFranchiseListings(citationListings).score;
+  const rankingScore =
+    keywordRankingScore > 0
+      ? keywordRankingScore
+      : calculateRankingScore(
+          mapsRank > 0 ? mapsRank : listing?.position ?? undefined
+        );
+
+  const { visibilityScore: resolvedLocalVisibility } = computeVisibilityScoreFromComponents({
+    rankingScore,
+    gbpOptimization: scores.gbpHealth,
+    reviewScore: scores.reviewScore,
+    citationScore: citationListingScore || scores.citationHealth,
+    websiteScore: calculateWebsiteScore(business.website ?? input.website),
+  });
 
   const dashboard: Partial<DashboardDoc> = {
     visibilityScore: resolvedLocalVisibility,
     listingSyncStatus: napListingSyncStatus(listing, napAudit),
     metrics: {
-      overallScore: scores.overallScore,
+      overallScore: Math.max(scores.overallScore, organicMetrics.authorityScore),
       aiVisibility:
         visibility?.aiVisibility ??
         scores.localVisibility,
       organicTraffic:
         visibility?.organicTraffic ??
+        organicMetrics.organicTraffic ??
         Math.max(1, Math.round((scores.localVisibility / 100) * (listing?.reviews ?? 10))),
       localVisibility: resolvedLocalVisibility,
       gbpHealth: scores.gbpHealth,
@@ -374,9 +444,9 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
       top10Keywords: top10Count || (listing?.position && listing.position <= 10 ? 1 : 0),
       rankingGains: keywords.filter((k) => k.change > 0).length,
       rankingLosses: keywords.filter((k) => k.change < 0).length,
-      totalReviews: reviewData?.placeReviewCount ?? listing?.reviews ?? 0,
-      reviewsThisMonth: reviewData?.inbox.length ?? 0,
-      averageRating: reviewData?.placeRating ?? listing?.rating ?? 0,
+      totalReviews: reviewBatch?.placeReviewCount ?? listing?.reviews ?? 0,
+      reviewsThisMonth: reviewBatch?.inbox.length ?? 0,
+      averageRating: reviewBatch?.placeRating ?? listing?.rating ?? 0,
       responseRate,
     },
     issues: scores.issues,
@@ -398,13 +468,25 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
     searchRegion: input.searchRegion,
   };
 
+  const rankTrackerSeed =
+    mapsRankResults.length > 0 && competitionLocation
+      ? buildRankTrackerSeed({
+          category: competitionCategory,
+          location: competitionLocation,
+          businessName: input.businessName,
+          placeId: listing?.place_id,
+          mapsResults: mapsRankResults,
+        })
+      : undefined;
+
   const rankings: Partial<RankingsDoc> = {
+    rankTrackerSeed,
     competitors,
     competitionAnalysis,
     keywords,
     keywordGroups: buildKeywordGroups(keywords),
     napAudit,
-    geoGrid,
+    geoGrid: null,
     aiSearchSignals: visibility?.platformSignals,
     visibilityQueries: visibility?.searchQueries,
     shareOfVoice: buildShareOfVoice(listing, competitors, keywords),
@@ -476,9 +558,6 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
       ...(listing?.position
         ? [`Live Maps position: #${listing.position} for "${searchQuery}"`]
         : ["Listing not found — verify business name, location, or add a Google Maps link"]),
-      ...(geoGrid
-        ? [`Geo-grid visibility: ${geoGrid.visibilityScore}% across ${geoGrid.points.length} points`]
-        : []),
       ...(visibility
         ? visibility.searchQueries
             .filter((q) => q.rank > 0)
@@ -492,28 +571,27 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
   };
 
   const reviews: Partial<ReviewsDoc> = {
-    inbox: reviewData?.inbox ?? [],
-    placeId: reviewData?.placeId ?? listing?.place_id,
-    fetchedAt: reviewData?.fetchedAt,
-    scannedCount: reviewData?.scannedCount,
-    totalOnGoogle: reviewData?.placeReviewCount ?? listing?.reviews,
-    reviewGoal: {
-      needed: reviewGap > 0 ? reviewGap : 10,
-      target: competitors.find((c) => !c.isYou)?.name ?? "local leader",
-      currentGap: reviewGap,
-    },
-    sentiment: reviewData?.sentiment ?? {
+    ...reviewsDocFromBatchFetch(reviewBatch, {
+      listingReviews: listing?.reviews,
+      batchesLoaded: 1,
+      reviewGoal: {
+        needed: reviewGap > 0 ? reviewGap : 10,
+        target: competitors.find((c) => !c.isYou)?.name ?? "local leader",
+        currentGap: reviewGap,
+      },
+    }),
+    sentiment: reviewBatch?.sentiment ?? {
       positive: listing?.rating && listing.rating >= 4 ? 70 : 40,
       neutral: 20,
       negative: listing?.rating && listing.rating < 4 ? 30 : 10,
       nps: listing?.rating ? Math.round((listing.rating - 3) * 25) : 0,
       avgResponseTimeHours: 0,
-      velocityPerMonth: reviewData?.inbox.length ?? 0,
+      velocityPerMonth: reviewBatch?.inbox.length ?? 0,
     },
     monitoredPlatforms: [
       {
         name: "Google",
-        count: reviewData?.placeReviewCount ?? listing?.reviews ?? 0,
+        count: reviewBatch?.placeReviewCount ?? listing?.reviews ?? 0,
         connected: Boolean(listing?.place_id),
       },
       { name: "Facebook", count: 0, connected: false },
@@ -521,6 +599,13 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
       { name: "TripAdvisor", count: 0, connected: false },
     ],
   };
+
+  const profileOptimization = listing
+    ? buildProfileOptimizationFromListing(listing, {
+        mapsLink: business.mapsPlaceId ?? listing.place_id,
+        websiteUrl: business.website,
+      })
+    : undefined;
 
   return {
     listing,
@@ -532,6 +617,7 @@ export async function runBusinessAnalysis(input: AnalysisInput) {
     dashboard,
     rankings,
     reviews,
+    profileOptimization,
     scores,
   };
 }

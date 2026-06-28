@@ -8,7 +8,11 @@ import {
   calculateReviewScore,
 } from "@/lib/seo/scoring-engine";
 import { imageCountFromListing } from "@/lib/seo/real-data";
-import { computeKeywordResearchVisibility } from "./visibility-score";
+import {
+  calculateRankingScore,
+  calculateWebsiteScore,
+  computeVisibilityScoreFromComponents,
+} from "@/lib/seo/visibility-score";
 
 function clamp(n: number, min = 0, max = 100) {
   return Math.round(Math.max(min, Math.min(max, n)));
@@ -36,20 +40,6 @@ export function buildVisibilityScores(input: {
   const topCompetitor = input.listings.find((l) => !l.isYou && l.position === 1);
   const yourListing = input.yourListing ?? null;
 
-  const localRanking = computeKeywordResearchVisibility(
-    yourListing,
-    input.yourPosition ?? you?.position
-  );
-
-  const userVisibility = localRanking;
-  const topVisibility = topCompetitor
-    ? computeKeywordResearchVisibility(null, topCompetitor.position)
-    : 0;
-
-  const competitor = topCompetitor
-    ? clamp((userVisibility / Math.max(topVisibility, 1)) * 100)
-    : 50;
-
   const review = calculateReviewScore(yourListing);
   const photos = imageCountFromListing(yourListing);
   const profileOptimization = clamp(
@@ -58,12 +48,24 @@ export function buildVisibilityScores(input: {
         (photos >= 10 ? 85 : photos >= 5 ? 65 : photos >= 1 ? 45 : 25))
   );
 
-  const overall = clamp(
-    localRanking * 0.4 +
-      review * 0.25 +
-      profileOptimization * 0.2 +
-      competitor * 0.15
-  );
+  const yourPosition = input.yourPosition ?? you?.position;
+  const localRanking = calculateRankingScore(yourPosition);
+
+  const overall = computeVisibilityScoreFromComponents({
+    rankingScore: localRanking,
+    gbpOptimization: profileOptimization,
+    reviewScore: review,
+    citationScore: 50,
+    websiteScore: calculateWebsiteScore(yourListing?.website),
+  }).visibilityScore;
+
+  const topRanking = topCompetitor
+    ? calculateRankingScore(topCompetitor.position)
+    : 0;
+
+  const competitor = topCompetitor
+    ? clamp((localRanking / Math.max(topRanking, 1)) * 100)
+    : 50;
 
   return {
     localRanking,

@@ -24,7 +24,6 @@ const PLAN_FEATURES = [
   "Business Image Enhancement",
   "Image Ranking Recommendations",
   "Performance & Growth Analytics",
-  "Customer Engagement Insights",
   "Local Visibility Tracking",
   "Actionable SEO Recommendations",
   "Priority Feature Updates",

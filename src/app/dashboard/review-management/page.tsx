@@ -19,6 +19,7 @@ import { getReviewLoadCooldownState } from "@/lib/seo/analysis-cooldown";
 import {
   MAX_UNANSWERED_BATCHES,
   MAX_UNANSWERED_REVIEWS,
+  hasAnalysisSeededReviews,
   reviewHasWrittenText,
 } from "@/lib/seo/real-data";
 
@@ -66,9 +67,17 @@ export default function ReviewManagementPage() {
   const needsInitialFetch = useMemo(() => {
     if (!hasMapsLink) return false;
     if (reviewsStale) return true;
+    if (hasAnalysisSeededReviews(reviews, businessPlaceId)) return false;
     if (unansweredWritten.length === 0 && batchesLoaded === 0) return true;
     return false;
-  }, [hasMapsLink, reviewsStale, unansweredWritten.length, batchesLoaded]);
+  }, [
+    hasMapsLink,
+    reviewsStale,
+    reviews,
+    businessPlaceId,
+    unansweredWritten.length,
+    batchesLoaded,
+  ]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);

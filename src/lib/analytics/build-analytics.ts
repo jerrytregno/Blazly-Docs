@@ -19,7 +19,6 @@ import type {
 import { hasBusinessWebsite, parseGoogleMapsPlaceId } from "@/lib/seo/maps-place";
 import {
   computeRatingTrend,
-  fetchLiveAnalyticsData,
   histogramToDistribution,
   type LiveAnalyticsSnapshot,
 } from "./fetch-live-analytics";
@@ -345,7 +344,11 @@ export async function prepareAnalyticsInput(
   if (live?.userPlace) {
     totalReviews = live.userPlace.reviews ?? totalReviews;
     averageRating = live.userPlace.rating ?? averageRating;
-  } else if ((totalReviews === 0 || averageRating === 0) && input.business.mapsPlaceId) {
+  } else if (
+    !live?.fromAnalysisCache &&
+    (totalReviews === 0 || averageRating === 0) &&
+    input.business.mapsPlaceId
+  ) {
     const placeId = parseGoogleMapsPlaceId(input.business.mapsPlaceId);
     if (placeId) {
       try {
@@ -399,10 +402,17 @@ export async function buildAnalyticsReportFromSources(
   input: BuildAnalyticsInput
 ): Promise<AnalyticsReport> {
   let live: LiveAnalyticsSnapshot | null = null;
-  try {
-    live = await fetchLiveAnalyticsData(input);
-  } catch (error) {
-    console.error("Live analytics fetch failed:", error);
+  const { shouldUseCachedAnalytics, buildCachedAnalyticsSnapshot, fetchLiveAnalyticsData } =
+    await import("./fetch-live-analytics");
+
+  if (shouldUseCachedAnalytics(input)) {
+    live = buildCachedAnalyticsSnapshot(input);
+  } else {
+    try {
+      live = await fetchLiveAnalyticsData(input);
+    } catch (error) {
+      console.error("Live analytics fetch failed:", error);
+    }
   }
   const prepared = await prepareAnalyticsInput(input, live);
 
@@ -437,29 +447,23 @@ export async function buildAnalyticsReportFromSources(
 
 function buildScores(
   dashboard: DashboardDoc,
-  userEngagement: number,
   resolved: ReturnType<typeof resolveUserMetrics>
 ): AnalyticsScores {
   const m = dashboard.metrics;
   const trafficScore = clamp(m.organicTraffic > 0 ? Math.min(100, m.organicTraffic / 2) : resolved.localVisibility * 0.85);
   const reviewScore = clamp(m.reviewScore || resolved.averageRating * 20);
   const reputationScore = clamp(resolved.averageRating * 20);
-  const engagementScore = clamp(
-    (resolved.responseRate * 0.35 + userEngagement * 0.4 + m.gbpHealth * 0.25)
-  );
   const visibilityScore = clamp(resolved.localVisibility);
   const overallScore = clamp(
-    trafficScore * 0.22 +
-      reviewScore * 0.22 +
-      reputationScore * 0.18 +
-      engagementScore * 0.18 +
-      visibilityScore * 0.2
+    trafficScore * 0.27 +
+      reviewScore * 0.27 +
+      reputationScore * 0.22 +
+      visibilityScore * 0.24
   );
   return {
     trafficScore,
     reviewScore,
     reputationScore,
-    engagementScore,
     visibilityScore,
     overallScore,
   };
@@ -474,6 +478,9 @@ export interface BuildAnalyticsInput {
 }
 
 function buildDataNote(live: LiveAnalyticsSnapshot | null | undefined): string {
+  if (live?.fromAnalysisCache) {
+    return "Metrics are built from your onboarding SEO analysis. Use Refresh to pull live Google Maps data via SearchAPI.";
+  }
   if (!live) {
     return "Metrics blend stored analysis data with estimates where live Maps data is unavailable. Add a Google Maps place ID and refresh to pull live SearchAPI data.";
   }
@@ -633,10 +640,6 @@ export function buildAnalyticsReport(
   const competitorPopularTimes =
     popularTimes?.competitor ?? buildPopularTimes(rival.name, business.primaryCategory);
 
-  const userEngagementTotal = dailyTrend.reduce((s, d) => s + d.engagement, 0);
-  const competitorEngagement = Math.round(
-    userEngagementTotal * (0.9 + seededUnit(rival.name, 7) * 0.25)
-  );
   const competitorTraffic = hasWebsite
     ? Math.round(userBusiness.websiteTraffic * (0.85 + seededUnit(rival.name, 5) * 0.35))
     : 0;
@@ -677,14 +680,6 @@ export function buildAnalyticsReport(
       userWins: localVisibility >= competitorVisibility,
       differencePercent: pctDiff(localVisibility, competitorVisibility),
       unit: "%",
-    },
-    {
-      label: "Customer Engagement",
-      userValue: userEngagementTotal,
-      competitorValue: competitorEngagement,
-      userWins: userEngagementTotal >= competitorEngagement,
-      growthPercent: resolved.responseRate,
-      unit: "actions",
     },
   ];
 
@@ -740,12 +735,6 @@ export function buildAnalyticsReport(
             ? "competitor"
             : "tie",
     },
-    {
-      metric: "Customer Engagement",
-      user: `${userEngagementTotal} actions`,
-      competitor: `${competitorEngagement} est.`,
-      winner: userEngagementTotal >= competitorEngagement ? "user" : "competitor",
-    },
   ];
 
   const opportunityAreas: string[] = [];
@@ -759,7 +748,7 @@ export function buildAnalyticsReport(
     opportunityAreas.push("Boost Maps visibility with GBP completeness and local keywords");
   }
   if (resolved.responseRate < 60) {
-    opportunityAreas.push("Reply to more Google reviews to lift engagement signals");
+    opportunityAreas.push("Reply to more Google reviews to strengthen your reputation");
   }
   if (!hasWebsite) {
     opportunityAreas.push("Add a website to your Google Business Profile to track website clicks and traffic");
@@ -788,7 +777,7 @@ export function buildAnalyticsReport(
     comparisonTable,
     opportunityAreas,
     betterPerforming: userWinsCount >= 3 ? "user" : "competitor",
-    scores: buildScores(dashboard, userEngagementTotal, {
+    scores: buildScores(dashboard, {
       ...resolved,
       totalReviews,
       averageRating,

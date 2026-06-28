@@ -176,6 +176,29 @@ export async function searchAtCoordinates(
   });
 }
 
+export interface GoogleSearchResponse {
+  local_results?: LocalBusiness[];
+  error?: string;
+}
+
+export async function fetchGoogleSearch(input: {
+  q: string;
+  location?: string;
+  gl?: string;
+  hl?: string;
+  google_domain?: string;
+}): Promise<GoogleSearchResponse> {
+  const query: Record<string, string> = {
+    engine: "google",
+    q: input.q,
+    google_domain: input.google_domain ?? "google.com",
+    hl: input.hl ?? "en",
+  };
+  if (input.location) query.location = input.location;
+  if (input.gl) query.gl = input.gl;
+  return searchApiRequest<GoogleSearchResponse>(query);
+}
+
 export function mergePlaceDetails(
   listing: LocalBusiness,
   place: GoogleMapsPlaceResponse

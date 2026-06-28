@@ -43,9 +43,9 @@ export async function fetchMapsCategoryRank(input: {
   lat?: number;
   lng?: number;
   gl?: string;
-}): Promise<{ rank: number; query: string; resultCount: number }> {
+}): Promise<{ rank: number; query: string; resultCount: number; results: LocalBusiness[] }> {
   const query = [input.category, input.location].filter(Boolean).join(" ").trim();
-  if (!query) return { rank: 0, query: "", resultCount: 0 };
+  if (!query) return { rank: 0, query: "", resultCount: 0, results: [] };
 
   try {
     const response =
@@ -69,8 +69,8 @@ export async function fetchMapsCategoryRank(input: {
       input.location
     );
 
-    return { rank, query, resultCount: results.length };
+    return { rank, query, resultCount: results.length, results };
   } catch {
-    return { rank: 0, query, resultCount: 0 };
+    return { rank: 0, query, resultCount: 0, results: [] };
   }
 }

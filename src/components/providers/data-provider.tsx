@@ -248,6 +248,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
           updateDashboard(user.uid, result.dashboard),
           updateRankings(user.uid, result.rankings),
           updateReviews(user.uid, result.reviews),
+          ...(result.profileOptimization
+            ? [updateProfileOptimization(user.uid, result.profileOptimization)]
+            : []),
         ]);
 
         setBusiness((prev) =>
@@ -290,6 +293,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
                 ...result.rankings,
                 keywords: result.rankings.keywords ?? prev.keywords,
                 napAudit: result.rankings.napAudit ?? prev.napAudit,
+                rankTrackerSeed: result.rankings.rankTrackerSeed ?? prev.rankTrackerSeed,
               }
             : prev
         );
@@ -302,6 +306,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
               }
             : prev
         );
+        if (result.profileOptimization) {
+          setProfileOptimization((prev) =>
+            prev
+              ? { ...prev, ...result.profileOptimization }
+              : ({ userId: user.uid, ...result.profileOptimization } as ProfileOptimizationDoc)
+          );
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : "Analysis failed";
         setAnalysisError(message);

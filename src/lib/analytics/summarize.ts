@@ -32,7 +32,6 @@ Scores (0-100):
 - Traffic: ${s.trafficScore}
 - Reviews: ${s.reviewScore}
 - Reputation: ${s.reputationScore}
-- Engagement: ${s.engagementScore}
 - Visibility: ${s.visibilityScore}
 - Overall: ${s.overallScore}
 

@@ -1,6 +1,7 @@
 import type { LocalBusiness } from "@/types";
 import type { IssueItem, LocalSeoFactorScore, ScoreItem } from "@/types/firestore";
 import { calculateLocalSeoScore } from "./local-seo-score";
+import { computeVisibilityScoreFromListing } from "./visibility-score";
 
 export interface ScoreBreakdown {
   gbpHealth: number;
@@ -123,19 +124,26 @@ export function calculateReviewScore(listing: LocalBusiness | null): number {
   return clamp(ratingPart + volumePart);
 }
 
-export function calculateLocalVisibility(listing: LocalBusiness | null): number {
-  if (!listing) return 10;
-  let score = 20;
-  if (listing.position != null) {
-    if (listing.position <= 3) score = 95;
-    else if (listing.position <= 5) score = 85;
-    else if (listing.position <= 10) score = 70;
-    else if (listing.position <= 20) score = 50;
-    else score = 35;
+export function calculateLocalVisibility(
+  listing: LocalBusiness | null,
+  context?: {
+    mapsRank?: number;
+    citationHealth?: number;
+    business?: { website?: string };
+    gbpOptimization?: number;
+    reviewScore?: number;
+    rankingScore?: number;
   }
-  if (listing.gps_coordinates) score += 5;
-  if (listing.open_state?.toLowerCase().includes("open")) score += 5;
-  return clamp(score);
+): number {
+  return computeVisibilityScoreFromListing({
+    listing,
+    mapsRank: context?.mapsRank ?? listing?.position ?? undefined,
+    citationHealth: context?.citationHealth,
+    business: context?.business,
+    gbpOptimization: context?.gbpOptimization,
+    reviewScore: context?.reviewScore,
+    rankingScore: context?.rankingScore,
+  }).visibilityScore;
 }
 
 export function calculateCitationHealth(
@@ -250,8 +258,16 @@ export function computeScores(
   const gbpHealthBreakdown = calculateGbpHealthBreakdown(listing);
   const gbpHealth = calculateGbpHealth(listing);
   const reviewScore = calculateReviewScore(listing);
-  const localVisibility = calculateLocalVisibility(listing);
   const citationHealth = calculateCitationHealth(listing, input);
+  const localVisibility = calculateLocalVisibility(listing, {
+    mapsRank: listing?.position ?? undefined,
+    citationHealth,
+    business: {
+      website: context?.business?.website ?? input.website,
+    },
+    gbpOptimization: gbpHealth,
+    reviewScore,
+  });
   const { score: overallScore, factors: localSeoFactors } = calculateLocalSeoScore({
     listing,
     business: context?.business ?? {
