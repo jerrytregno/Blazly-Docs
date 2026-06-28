@@ -4,7 +4,6 @@ import {
   ChevronRight,
   ExternalLink,
   Loader2,
-  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { normalizeUserWebsite } from "@/lib/seo/maps-place";
@@ -83,11 +82,7 @@ export function DashboardHeader({
             disabled={analyzing || !canRerunAnalysis}
             className="gap-2"
           >
-            {analyzing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
+            {analyzing && <Loader2 className="h-4 w-4 animate-spin" />}
             {analyzing ? "Analyzing…" : "Run analysis"}
           </Button>
           {!canRerunAnalysis && analysisCooldownMessage && (
