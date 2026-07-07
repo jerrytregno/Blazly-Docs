@@ -12,15 +12,37 @@ export interface DocNavProduct {
   articles: DocNavArticle[];
 }
 
-export const DOCS_NAV: DocNavProduct[] = DOC_PRODUCTS.map((product) => ({
-  slug: product.slug,
-  name: product.name,
-  shortName: product.name.replace(/^Blazly\s+/i, ""),
-  articles: product.articles.map((article) => ({
-    slug: article.slug,
-    title: article.title,
-  })),
-}));
+/** Sidebar and home page product order — Blazly SEO first, Local SEO last. */
+const PRODUCT_NAV_ORDER = [
+  "seo",
+  "geo",
+  "backlinker",
+  "lead-engine",
+  "social",
+  "local-seo",
+] as const;
+
+function toNavProduct(
+  product: (typeof DOC_PRODUCTS)[number]
+): DocNavProduct {
+  return {
+    slug: product.slug,
+    name: product.name,
+    shortName: product.name.replace(/^Blazly\s+/i, ""),
+    articles: product.articles.map((article) => ({
+      slug: article.slug,
+      title: article.title,
+    })),
+  };
+}
+
+export const DOCS_NAV: DocNavProduct[] = PRODUCT_NAV_ORDER.map((slug) => {
+  const product = DOC_PRODUCTS.find((entry) => entry.slug === slug);
+  if (!product) {
+    throw new Error(`Missing docs product for nav slug: ${slug}`);
+  }
+  return toNavProduct(product);
+});
 
 /** Blazly marketing site URL per product docs section */
 export const PRODUCT_WEBSITE_URLS: Record<string, string> = {

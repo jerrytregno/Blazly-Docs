@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AuthProvider } from "@/components/providers/auth-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,14 +14,14 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Blazly Local SEO — Dominate Local Search with AI",
-    template: "%s | Blazly Local SEO",
+    default: "Blazly Documentation",
+    template: "%s | Blazly Docs",
   },
   description:
-    "AI-powered local SEO platform for Google Maps visibility, competitor analysis, rank tracking, and review management.",
+    "Product documentation for Blazly SEO, GEO, Backlinker, Lead Engine, Local SEO, and Social.",
   icons: {
-    icon: "/blazly-local-seo-logo.png",
-    apple: "/blazly-local-seo-logo.png",
+    icon: "/blazly-logo-white.png",
+    apple: "/blazly-logo-white.png",
   },
 };
 
@@ -32,11 +31,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="scroll-smooth">
+    <html lang="en" className="scroll-smooth" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AuthProvider>{children}</AuthProvider>
+        {children}
       </body>
     </html>
   );

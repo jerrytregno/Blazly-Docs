@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { searchDocs } from "@/content/docs";
+import { useDocsTheme } from "./docs-theme";
 
 export function DocsSearchBar({ onOpen }: { onOpen?: () => void }) {
   return (
@@ -29,7 +31,13 @@ export function DocsSearchDialog({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const { theme } = useDocsTheme();
   const [query, setQuery] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const results = useMemo(() => searchDocs(query, 12), [query]);
 
@@ -44,6 +52,10 @@ export function DocsSearchDialog({
 
   useEffect(() => {
     if (!open) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       if (e.key === "Enter" && results[0]) {
@@ -52,62 +64,75 @@ export function DocsSearchDialog({
       }
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
   }, [open, onClose, results, go]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/40 p-4 pt-[12vh] backdrop-blur-sm dark:bg-black/70">
-      <div className="w-full max-w-lg overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#14141c]">
-        <div className="flex items-center gap-2 border-b border-slate-100 px-4 dark:border-white/10">
-          <Search className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-          <input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search documentation..."
-            className="h-12 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
-          />
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-300"
-            aria-label="Close search"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <ul className="max-h-80 overflow-y-auto py-2">
-          {results.length === 0 ? (
-            <li className="px-4 py-6 text-center text-sm text-slate-500">No results found</li>
-          ) : (
-            results.map((item) => (
-              <li key={`${item.productSlug}-${item.articleSlug}`}>
-                <button
-                  type="button"
-                  onClick={() => go(item.href)}
-                  className="w-full px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-white/5"
-                >
-                  <span className="mb-0.5 block text-[11px] font-medium text-brand-600 dark:text-violet-400">
-                    {item.productName} › {item.articleTitle}
-                  </span>
-                  <span className="block text-sm text-slate-700 dark:text-slate-300">
-                    {item.articleTitle}
-                  </span>
-                  {item.snippet && (
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">
-                      {item.snippet}
-                    </span>
-                  )}
-                </button>
+  return createPortal(
+    <div className={`fixed inset-0 z-[100] ${theme === "dark" ? "dark" : ""}`}>
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm dark:bg-black/70"
+        onClick={onClose}
+        aria-label="Close search"
+      />
+      <div className="pointer-events-none relative flex min-h-full items-start justify-center p-4 pt-[10vh] sm:pt-[14vh]">
+        <div className="pointer-events-auto flex w-full max-w-lg max-h-[min(80vh,640px)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-[#14141c]">
+          <div className="flex shrink-0 items-center gap-2 border-b border-slate-100 px-4 dark:border-white/10">
+            <Search className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search documentation..."
+              className="h-12 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500"
+            />
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-white/5 dark:hover:text-slate-300"
+              aria-label="Close search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <ul className="min-h-0 flex-1 overflow-y-auto py-2 pb-3">
+            {results.length === 0 ? (
+              <li className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                No results found
               </li>
-            ))
-          )}
-        </ul>
+            ) : (
+              results.map((item) => (
+                <li key={`${item.productSlug}-${item.articleSlug}`}>
+                  <button
+                    type="button"
+                    onClick={() => go(item.href)}
+                    className="w-full px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-white/5"
+                  >
+                    <span className="mb-0.5 block text-[11px] font-medium text-brand-600 dark:text-brand-400">
+                      {item.productName} › {item.articleTitle}
+                    </span>
+                    <span className="block text-sm text-slate-700 dark:text-slate-200">
+                      {item.articleTitle}
+                    </span>
+                    {item.snippet && (
+                      <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
+                        {item.snippet}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
       </div>
-      <button type="button" className="absolute inset-0 -z-10" onClick={onClose} aria-label="Close" />
-    </div>
+    </div>,
+    document.body
   );
 }
 

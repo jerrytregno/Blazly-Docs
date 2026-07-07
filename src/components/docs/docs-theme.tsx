@@ -36,12 +36,20 @@ export function DocsThemeProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setThemeState(readStoredTheme());
+    const stored = readStoredTheme();
+    setThemeState(stored);
+    document.documentElement.classList.toggle("dark", stored === "dark");
     setReady(true);
   }, []);
 
+  useEffect(() => {
+    if (!ready) return;
+    document.documentElement.classList.toggle("dark", theme === "dark");
+  }, [theme, ready]);
+
   const setTheme = useCallback((next: DocsTheme) => {
     setThemeState(next);
+    document.documentElement.classList.toggle("dark", next === "dark");
     try {
       localStorage.setItem(STORAGE_KEY, next);
     } catch {
@@ -59,9 +67,7 @@ export function DocsThemeProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <DocsThemeContext.Provider value={value}>
-      <div className={ready && theme === "dark" ? "dark" : undefined}>{children}</div>
-    </DocsThemeContext.Provider>
+    <DocsThemeContext.Provider value={value}>{children}</DocsThemeContext.Provider>
   );
 }
 
