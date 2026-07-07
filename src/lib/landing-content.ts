@@ -15,6 +15,7 @@ export const DEMO_CALENDLY_URL = "https://calendly.com/blazly-marketing/blazly-d
 export const NAV_LINKS = [
   { label: "Features", href: "#features" },
   { label: "How It Works", href: "#how-it-works" },
+  { label: "Docs", href: "/docs" },
   { label: "FAQ", href: "#faq" },
 ];
 
@@ -216,7 +217,7 @@ export const FOOTER_LINKS = {
     { label: "Competitor Analysis", href: "#features" },
   ],
   resources: [
-    { label: "Documentation", href: "#" },
+    { label: "Documentation", href: "/docs" },
     { label: "Blog", href: "#" },
     { label: "Contact", href: "#" },
     { label: "FAQ", href: "#faq" },
