@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DOCS_NAV, articlePath } from "@/config/docs-navigation";
 import { getArticle } from "@/content/docs";
+import { absoluteUrl } from "@/config/site";
 import { DocsContentRenderer } from "@/components/docs/docs-content-renderer";
 
 interface PageProps {
@@ -26,6 +27,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${article.title} — ${article.product.name}`,
     description: article.description || article.title,
+    alternates: {
+      canonical: absoluteUrl(articlePath(productSlug, articleSlug)),
+    },
   };
 }
 
